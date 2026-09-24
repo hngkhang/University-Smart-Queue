@@ -8,7 +8,7 @@ import {
   Mail,
   
 } from "lucide-react";
-import {useNavigate } from "react-router";
+import {useNavigate, useSearchParams } from "react-router";
 
 import campusImage from "../assets/hcmute-campus.jpg";
 
@@ -52,6 +52,7 @@ const getRedirectPath = (userRole: LoginResponse["user"]["role"]) => {
 
 function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState(roles[0].id);
@@ -109,7 +110,9 @@ function LoginPage() {
       });
 
       window.setTimeout(() => {
-        navigate(getRedirectPath(authenticatedUser.role));
+        const redirect = searchParams.get("redirect");
+        const safeRedirect = redirect && /^\/appointments(?:\/new)?(?:\?[^#]*)?$/.test(redirect);
+        navigate(safeRedirect && authenticatedUser.role === "student" ? redirect : getRedirectPath(authenticatedUser.role));
       }, 700);
     } catch (error) {
       const message =

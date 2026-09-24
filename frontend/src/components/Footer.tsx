@@ -41,7 +41,7 @@ function Footer() {
                 </Link>
               </li>
               <li>
-                <Link to="/appointments" className="text-sm text-slate-500 hover:text-blue-600 transition-colors">
+                <Link to="/appointments/new" className="text-sm text-slate-500 hover:text-blue-600 transition-colors">
                   Book Appointment
                 </Link>
               </li>

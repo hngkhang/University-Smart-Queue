@@ -5,6 +5,9 @@ import DepartmentPage from "./pages/DepartmentPage";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
+import BookAppointmentPage from "./pages/BookAppointmentPage";
+import AppointmentsPage from "./pages/AppointmentsPage";
+import StudentAccess from "./components/StudentAccess";
 
 function App() {
   return (
@@ -27,8 +30,10 @@ function App() {
 
           <Route
             path="/appointments"
-            element={<PlaceholderPage title="Appointments" />}
+            element={<StudentAccess><AppointmentsPage /></StudentAccess>}
           />
+
+          <Route path="/appointments/new" element={<StudentAccess><BookAppointmentPage /></StudentAccess>} />
 
           <Route path="/login" element={<LoginPage />} />
 

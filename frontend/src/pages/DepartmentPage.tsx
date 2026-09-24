@@ -222,13 +222,13 @@ function DepartmentPage() {
                 Join Online Queue
               </button>
 
-              <button
-                type="button"
+              <Link
+                to={`/appointments/new?department=${encodeURIComponent(department.id)}`}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               >
                 <CalendarDays size={17} />
                 Book Appointment
-              </button>
+              </Link>
             </div>
           </section>
         </aside>
