@@ -11,12 +11,7 @@ import {
 import {useNavigate, useSearchParams } from "react-router";
 
 import campusImage from "../assets/hcmute-campus.jpg";
-
-const roles = [
-  { id: "student", label: "Student" },
-  { id: "staff", label: "Staff" },
-  { id: "admin", label: "Admin" },
-];
+import { saveSession } from "../services/session";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:5000/api";
 
@@ -55,7 +50,6 @@ function LoginPage() {
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState(roles[0].id);
   const [rememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [status, setStatus] = useState<LoginStatus | null>(null);
@@ -84,7 +78,6 @@ function LoginPage() {
         body: JSON.stringify({
           email,
           password,
-          role,
           rememberMe,
         }),
       });
@@ -96,13 +89,7 @@ function LoginPage() {
       }
 
       const authenticatedUser = data.user;
-      const storage = rememberMe ? localStorage : sessionStorage;
-      const inactiveStorage = rememberMe ? sessionStorage : localStorage;
-
-      storage.setItem("smartqueue_token", data.token);
-      storage.setItem("smartqueue_user", JSON.stringify(authenticatedUser));
-      inactiveStorage.removeItem("smartqueue_token");
-      inactiveStorage.removeItem("smartqueue_user");
+      saveSession(data.token, authenticatedUser, rememberMe);
 
       setStatus({
         type: "success",
@@ -111,7 +98,7 @@ function LoginPage() {
 
       window.setTimeout(() => {
         const redirect = searchParams.get("redirect");
-        const safeRedirect = redirect && /^\/appointments(?:\/new)?(?:\?[^#]*)?$/.test(redirect);
+        const safeRedirect = redirect && /^\/(?:appointments(?:\/new)?|queue|departments\/[a-f\d]{24})(?:\?[^#]*)?$/i.test(redirect);
         navigate(safeRedirect && authenticatedUser.role === "student" ? redirect : getRedirectPath(authenticatedUser.role));
       }, 700);
     } catch (error) {
@@ -150,23 +137,6 @@ function LoginPage() {
           >
             <h3 className="text-2xl font-bold text-slate-900 mb-6 text-center">Sign In</h3>
 
-            <div className="mb-6 grid grid-cols-3 gap-2 rounded-lg bg-slate-100 p-1">
-              {roles.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setRole(item.id)}
-                  className={`rounded-md px-3 py-2 text-sm font-semibold transition ${
-                    role === item.id
-                      ? "bg-white text-blue-800 shadow-sm"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-
             <label className="mt-6 block">
               <span className="text-sm font-semibold text-slate-700">Email</span>
               <span className="mt-2 flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 transition focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-100">
@@ -175,7 +145,7 @@ function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  placeholder="student@hcmute.edu.vn"
+                  placeholder="Enter your email"
                   className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
                 />
               </span>

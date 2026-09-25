@@ -7,13 +7,17 @@ import {
   Users,
   UserRoundCheck,
 } from "lucide-react";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { useEffect, useState } from "react";
 import { fetchDepartment } from "../services/departments";
 import type { Department } from "../types";
+import JoinQueueModal from "../components/JoinQueueModal";
+import { readSession } from "../services/session";
 
 function DepartmentPage() {
   const { departmentId } = useParams();
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const [department, setDepartment] = useState<Department | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -130,7 +134,7 @@ function DepartmentPage() {
                     : "bg-slate-100 text-slate-500"
                 }`}
               >
-                {isOpen ? "Open" : "Closed"}
+                {isOpen ? "Open" : department.status === "paused" ? "Paused" : "Closed"}
               </span>
             </div>
 
@@ -146,7 +150,7 @@ function DepartmentPage() {
               <div className="rounded-xl bg-slate-50 p-4">
                 <Clock3 size={19} className="text-blue-700" />
                 <p className="mt-3 text-2xl font-bold text-slate-900">
-                  {isOpen ? `~${department.estimatedWait}` : "--"}
+                  {isOpen && department.estimatedWait != null ? `~${department.estimatedWait}` : "--"}
                 </p>
                 <p className="text-sm text-slate-500">
                   Estimated minutes
@@ -156,7 +160,7 @@ function DepartmentPage() {
               <div className="rounded-xl bg-slate-50 p-4">
                 <UserRoundCheck size={19} className="text-blue-700" />
                 <p className="mt-3 text-2xl font-bold text-slate-900">
-                  {department.activeCounters}
+                  {department.activeCounters ?? "--"}
                 </p>
                 <p className="text-sm text-slate-500">Active counters</p>
               </div>
@@ -217,6 +221,15 @@ function DepartmentPage() {
               <button
                 type="button"
                 disabled={!isOpen}
+                onClick={() => {
+                  const session = readSession();
+                  const target = `/departments/${department.id}?join=1`;
+                  if (!session || session.user.role !== "student") {
+                    navigate(`/login?redirect=${encodeURIComponent(target)}`);
+                    return;
+                  }
+                  setParams({ join: "1" });
+                }}
                 className="w-full rounded-xl bg-[#3F6392] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#2E4B72] disabled:cursor-not-allowed disabled:bg-slate-300 shadow-sm hover:shadow active:scale-[0.98]"
               >
                 Join Online Queue
@@ -233,6 +246,7 @@ function DepartmentPage() {
           </section>
         </aside>
       </div>
+      <JoinQueueModal key={department.id} department={department} open={params.get("join") === "1"} onClose={() => setParams({}, { replace: true })} />
     </main>
   );
 }

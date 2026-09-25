@@ -2,6 +2,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const Department = require("../models/Department");
 const Queue = require("../models/Queue");
+const QueueTicket = require("../models/QueueTicket");
 
 const router = express.Router();
 
@@ -34,7 +35,7 @@ const getStatus = (department, queue) => {
   return "open";
 };
 
-const mapDepartmentResponse = (department, queue) => {
+const mapDepartmentResponse = (department, queue, waitingCount = 0) => {
   const services = Array.isArray(department.services)
     ? department.services.map((service) => service.name).filter(Boolean)
     : [];
@@ -45,12 +46,14 @@ const mapDepartmentResponse = (department, queue) => {
     vietnameseName: department.vietnameseName || department.name,
     description: department.description,
     status: getStatus(department, queue),
-    waitingCount: 0,
-    estimatedWait: queue?.averageServiceTime || 0,
-    activeCounters: Array.isArray(department.staff)
-      ? department.staff.length
-      : 0,
+    waitingCount,
+    estimatedWait: null,
+    activeCounters: null,
     services,
+    serviceDetails: (department.services || []).map((service) => ({
+      name: service.name,
+      estimatedDuration: service.estimatedDuration || 0,
+    })),
     location: formatLocation(department.location),
     workingHours: department.workingHours || DEFAULT_WORKING_HOURS,
   };
@@ -82,12 +85,18 @@ router.get("/", async (_req, res) => {
     const queueByDepartment = await getQueuesByDepartment(
       departments.map((department) => department._id),
     );
+    const counts = await QueueTicket.aggregate([
+      { $match: { status: "waiting" } },
+      { $group: { _id: "$department", count: { $sum: 1 } } },
+    ]);
+    const waitingCounts = new Map(counts.map((item) => [item._id.toString(), item.count]));
 
     return res.json({
       departments: departments.map((department) =>
         mapDepartmentResponse(
           department,
           queueByDepartment.get(department._id.toString()),
+          waitingCounts.get(department._id.toString()) || 0,
         ),
       ),
     });
@@ -101,6 +110,9 @@ router.get("/", async (_req, res) => {
 
 router.get("/:departmentId", async (req, res) => {
   try {
+    if (!mongoose.isObjectIdOrHexString(req.params.departmentId)) {
+      return res.status(400).json({ message: "Invalid department." });
+    }
     if (mongoose.connection.readyState !== 1) {
       return res.status(503).json({
         message: "Database is not connected.",
@@ -120,7 +132,9 @@ router.get("/:departmentId", async (req, res) => {
     }).lean();
 
     return res.json({
-      department: mapDepartmentResponse(department, queue),
+      department: mapDepartmentResponse(department, queue, await QueueTicket.countDocuments({
+        department: department._id, status: "waiting",
+      })),
     });
   } catch (error) {
     console.error("Load department error:", error);

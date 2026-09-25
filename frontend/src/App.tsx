@@ -8,6 +8,7 @@ import PlaceholderPage from "./pages/PlaceholderPage";
 import BookAppointmentPage from "./pages/BookAppointmentPage";
 import AppointmentsPage from "./pages/AppointmentsPage";
 import StudentAccess from "./components/StudentAccess";
+import MyQueuePage from "./pages/MyQueuePage";
 
 function App() {
   return (
@@ -25,7 +26,7 @@ function App() {
 
           <Route
             path="/queue"
-            element={<PlaceholderPage title="My Queue" />}
+            element={<MyQueuePage />}
           />
 
           <Route

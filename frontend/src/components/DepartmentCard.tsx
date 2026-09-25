@@ -44,7 +44,7 @@ function DepartmentCard({ department }: DepartmentCardProps) {
                 isOpen ? "bg-emerald-500" : "bg-slate-400"
               }`}
             />
-            {isOpen ? "Open" : "Closed"}
+            {isOpen ? "Open" : department.status === "paused" ? "Paused" : "Closed"}
           </div>
         </div>
 
@@ -69,7 +69,7 @@ function DepartmentCard({ department }: DepartmentCardProps) {
               <span className="text-[10px] font-bold uppercase tracking-wider">ETA</span>
             </div>
             <p className="text-sm font-bold text-slate-800">
-              {isOpen ? `${department.estimatedWait}m` : "--"}
+              {isOpen && department.estimatedWait != null ? `${department.estimatedWait}m` : "--"}
             </p>
           </div>
 
@@ -79,7 +79,7 @@ function DepartmentCard({ department }: DepartmentCardProps) {
               <span className="text-[10px] font-bold uppercase tracking-wider">Desk</span>
             </div>
             <p className="text-sm font-bold text-slate-800">
-              {department.activeCounters}
+              {department.activeCounters ?? "--"}
             </p>
           </div>
         </div>
