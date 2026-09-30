@@ -1,19 +1,14 @@
 import type { SubmitEvent } from "react";
 import { useState } from "react";
-import {
-  
-  Eye,
-  EyeOff,
-  LockKeyhole,
-  Mail,
-  
-} from "lucide-react";
-import {useNavigate, useSearchParams } from "react-router";
+import { Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router";
 
 import campusImage from "../assets/hcmute-campus.jpg";
 import { saveSession } from "../services/session";
+import ForgotPasswordDialog from "../components/ForgotPasswordDialog";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:5000/api";
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ?? "http://127.0.0.1:5000/api";
 
 type LoginStatus = {
   type: "error" | "success";
@@ -38,6 +33,7 @@ type LoginResponse = {
 };
 
 const getRedirectPath = (userRole: LoginResponse["user"]["role"]) => {
+  if (userRole === "admin") return "/admin";
   if (userRole === "staff") return "/staff";
   if (userRole === "student") {
     return "/queue";
@@ -55,6 +51,7 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [status, setStatus] = useState<LoginStatus | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
 
   const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -99,9 +96,24 @@ function LoginPage() {
 
       window.setTimeout(() => {
         const redirect = searchParams.get("redirect");
-        const safeRedirect = redirect && /^\/(?:appointments(?:\/new)?|queue|departments\/[a-f\d]{24})(?:\?[^#]*)?$/i.test(redirect);
-        const staffRedirect = authenticatedUser.role === "staff" && (redirect === "/staff" || redirect === "/staff/history");
-        navigate(staffRedirect || (safeRedirect && authenticatedUser.role === "student") ? redirect! : getRedirectPath(authenticatedUser.role));
+        const safeRedirect =
+          redirect &&
+          /^\/(?:appointments(?:\/new)?|queue|departments\/[a-f\d]{24})(?:\?[^#]*)?$/i.test(
+            redirect,
+          );
+        const staffRedirect =
+          authenticatedUser.role === "staff" &&
+          (redirect === "/staff" || redirect === "/staff/history");
+        const adminRedirect =
+          authenticatedUser.role === "admin" &&
+          /^\/admin(?:\/(?:requests|users|activity))?$/.test(redirect || "");
+        navigate(
+          adminRedirect ||
+            staffRedirect ||
+            (safeRedirect && authenticatedUser.role === "student")
+            ? redirect!
+            : getRedirectPath(authenticatedUser.role),
+        );
       }, 700);
     } catch (error) {
       const message =
@@ -130,17 +142,18 @@ function LoginPage() {
       {/* Right side: Login Form */}
       <div className="flex flex-1 flex-col items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
         <div className="w-full max-w-[440px]">
-          
-         
-
           <form
             onSubmit={handleSubmit}
             className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl sm:p-8"
           >
-            <h3 className="text-2xl font-bold text-slate-900 mb-6 text-center">Sign In</h3>
+            <h3 className="text-2xl font-bold text-slate-900 mb-6 text-center">
+              Sign In
+            </h3>
 
             <label className="mt-6 block">
-              <span className="text-sm font-semibold text-slate-700">Email</span>
+              <span className="text-sm font-semibold text-slate-700">
+                Email
+              </span>
               <span className="mt-2 flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 transition focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-100">
                 <Mail size={19} className="text-slate-400" />
                 <input
@@ -178,13 +191,12 @@ function LoginPage() {
             </label>
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-              <label className="flex items-center gap-2 font-medium text-slate-600">
-                
-              </label>
+              <label className="flex items-center gap-2 font-medium text-slate-600"></label>
 
               <button
                 type="button"
                 className="font-semibold text-blue-700 transition hover:text-blue-900"
+                onClick={() => setForgotPasswordOpen(true)}
               >
                 Forgot password?
               </button>
@@ -209,11 +221,15 @@ function LoginPage() {
             >
               {isSubmitting ? "Signing in..." : "Sign in"}
             </button>
-
-           
           </form>
         </div>
       </div>
+      {forgotPasswordOpen && (
+        <ForgotPasswordDialog
+          initialEmail={email}
+          onClose={() => setForgotPasswordOpen(false)}
+        />
+      )}
     </main>
   );
 }

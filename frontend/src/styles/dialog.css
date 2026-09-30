@@ -1,0 +1,174 @@
+.sq-dialog {
+  margin: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 0;
+  width: min(520px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  color: #142a42;
+  background: white;
+  box-shadow: 0 24px 90px #12263b33;
+  font-size: 14px;
+}
+.sq-dialog::backdrop {
+  background: #13253a88;
+  backdrop-filter: blur(3px);
+}
+.sq-dialog-wide {
+  width: min(620px, calc(100% - 32px));
+}
+.sq-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px;
+  border-bottom: 1px solid #e3e9f1;
+}
+.sq-dialog h2 {
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 7px;
+}
+.sq-dialog-eyebrow {
+  font-size: 10px;
+  letter-spacing: 1.4px;
+  font-weight: 700;
+  color: #53657e;
+}
+.sq-dialog-close {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.sq-dialog-body {
+  padding: 24px;
+}
+.sq-dialog label {
+  display: block;
+  font-weight: 600;
+  margin: 18px 0 7px;
+}
+.sq-dialog input:not([type="checkbox"]),
+.sq-dialog textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: white;
+  color: #142a42;
+  font: inherit;
+}
+.sq-dialog textarea {
+  resize: vertical;
+  min-height: 90px;
+}
+.sq-dialog p {
+  line-height: 1.65;
+}
+.sq-dialog .sq-help {
+  font-size: 12px;
+  color: #52647b;
+  margin-top: 7px;
+}
+.sq-dialog :is(button, input, textarea):focus-visible {
+  outline: 3px solid #245de4;
+  outline-offset: 3px;
+}
+.sq-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+.sq-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 17px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: white;
+  font-size: 13px;
+  font-weight: 650;
+  min-height: 44px;
+  cursor: pointer;
+  color: #243a55;
+  text-decoration: none;
+}
+.sq-button-primary {
+  background: #245de4;
+  border-color: #245de4;
+  color: white;
+}
+.sq-button-danger {
+  color: #b42338;
+  border-color: #eebec5;
+  background: #fff5f6;
+}
+.sq-button:hover {
+  filter: brightness(0.96);
+}
+.sq-button:disabled,
+.sq-dialog button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.sq-notice {
+  padding: 13px 16px;
+  border: 1px solid #bed2f6;
+  background: #eff5ff;
+  border-radius: 10px;
+  color: #284876;
+  line-height: 1.65;
+}
+.sq-error {
+  border-color: #f1c5cb;
+  background: #fff4f5;
+  color: #a52437;
+}
+.sq-success {
+  border-color: #b8ded1;
+  background: #eefaf5;
+  color: #176749;
+}
+.sq-password-field {
+  position: relative;
+}
+.sq-password-field input {
+  padding-right: 52px !important;
+}
+.sq-password-field button {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  height: 40px;
+  width: 44px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.sq-dialog .sq-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-weight: 500;
+  line-height: 1.6;
+  padding: 14px;
+  background: #f4f7fb;
+  border-radius: 10px;
+}
+.sq-check input {
+  margin-top: 5px;
+  accent-color: #245de4;
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+}

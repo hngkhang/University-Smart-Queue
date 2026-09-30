@@ -58,6 +58,11 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/departments", departmentRoutes);
 app.use("/api/queue", queueRoutes);
+app.use("/api/admin", require("./routes/adminRoutes"));
+app.use((error, _req, res, _next) => {
+  console.error("API error:", error.message);
+  res.status(500).json({ message: "Unable to complete this request. Please try again." });
+});
 
 mongoose
   .connect(mongoUri, {

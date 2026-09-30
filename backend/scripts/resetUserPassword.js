@@ -90,6 +90,7 @@ const resetPassword = async () => {
   }
 
   user.password = await bcrypt.hash(password, 12);
+  user.$inc("sessionVersion", 1);
   await user.save();
   await closeConnection();
 

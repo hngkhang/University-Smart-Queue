@@ -138,8 +138,21 @@ export default function Navbar() {
               </button>
               {isAccountMenuOpen && (
                 <div id="account-dropdown" className="sq-account-dropdown">
+                  {session.user.role === "admin" && (
+                    <Link
+                      to="/admin"
+                      className="sq-staff-link"
+                      onClick={closeMenus}
+                    >
+                      <UserRound size={16} aria-hidden="true" /> Admin workspace
+                    </Link>
+                  )}
                   {session.user.role === "staff" && (
-                    <Link to="/staff" className="sq-staff-link" onClick={closeMenus}>
+                    <Link
+                      to="/staff"
+                      className="sq-staff-link"
+                      onClick={closeMenus}
+                    >
                       <UserRound size={16} aria-hidden="true" /> Staff workspace
                     </Link>
                   )}

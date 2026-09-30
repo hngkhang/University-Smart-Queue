@@ -10,9 +10,15 @@ import AppointmentsPage from "./pages/AppointmentsPage";
 import StudentAccess from "./components/StudentAccess";
 import MyQueuePage from "./pages/MyQueuePage";
 import StaffWorkspace from "./pages/StaffWorkspace";
+import AdminWorkspace from "./pages/AdminWorkspace";
+import { useSessionValidation } from "./services/useSessionValidation";
 
 function App() {
+  useSessionValidation();
   const { pathname } = useLocation();
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+    return <AdminWorkspace />;
+  }
   if (pathname === "/staff" || pathname.startsWith("/staff/")) {
     return <StaffWorkspace />;
   }
@@ -29,17 +35,25 @@ function App() {
             element={<DepartmentPage />}
           />
 
-          <Route
-            path="/queue"
-            element={<MyQueuePage />}
-          />
+          <Route path="/queue" element={<MyQueuePage />} />
 
           <Route
             path="/appointments"
-            element={<StudentAccess><AppointmentsPage /></StudentAccess>}
+            element={
+              <StudentAccess>
+                <AppointmentsPage />
+              </StudentAccess>
+            }
           />
 
-          <Route path="/appointments/new" element={<StudentAccess><BookAppointmentPage /></StudentAccess>} />
+          <Route
+            path="/appointments/new"
+            element={
+              <StudentAccess>
+                <BookAppointmentPage />
+              </StudentAccess>
+            }
+          />
 
           <Route path="/login" element={<LoginPage />} />
 
