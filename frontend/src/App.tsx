@@ -15,7 +15,7 @@ function App() {
     <div className="flex min-h-screen flex-col bg-slate-50">
       <Navbar />
 
-      <div className="flex-1">
+      <div id="main-content" tabIndex={-1} className="flex-1">
         <Routes>
           <Route path="/" element={<HomePage />} />
 

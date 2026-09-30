@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router";
+import { Link, Navigate, useLocation } from "react-router";
 import {
   ArrowRight,
   CheckCircle2,
@@ -148,18 +148,10 @@ export default function MyQueuePage() {
 
   if (!session || session.user.role !== "student" || unauthorized)
     return (
-      <main className="mx-auto max-w-3xl px-4 py-20">
-        <h1 className="text-3xl font-bold text-slate-900">My Queue</h1>
-        <p className="mt-3 text-slate-500">
-          Sign in with an active student account to view and manage your ticket.
-        </p>
-        <Link
-          to="/login?redirect=%2Fqueue"
-          className="mt-6 inline-flex rounded-xl bg-[#3F6392] px-5 py-3 text-sm font-semibold text-white"
-        >
-          Sign in as a student
-        </Link>
-      </main>
+      <Navigate
+        to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`}
+        replace
+      />
     );
 
   const ticket = data?.ticket;

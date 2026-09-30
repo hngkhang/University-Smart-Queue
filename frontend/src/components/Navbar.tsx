@@ -1,8 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { Bell, Menu, LogIn, LogOut, UserRound, ChevronDown } from "lucide-react";
+import {
+  ArrowUpRight,
+  Menu,
+  LogOut,
+  UserRound,
+  ChevronDown,
+  X,
+} from "lucide-react";
 import { NavLink, Link, useNavigate } from "react-router";
 import logo from "../assets/hcmute-logo.png";
-import { clearSession, readSession, SESSION_CHANGED_EVENT } from "../services/session";
+import {
+  clearSession,
+  readSession,
+  SESSION_CHANGED_EVENT,
+} from "../services/session";
 
 const navItems = [
   { label: "Home", path: "/" },
@@ -10,17 +21,21 @@ const navItems = [
   { label: "Appointments", path: "/appointments" },
 ];
 
-function Navbar() {
+export default function Navbar() {
   const navigate = useNavigate();
   const [session, setSession] = useState(readSession);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const [isNavigationOpen, setIsNavigationOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const accountButtonRef = useRef<HTMLButtonElement>(null);
+  const navigationRef = useRef<HTMLElement>(null);
+  const navigationButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const refreshSession = () => {
       setSession(readSession());
       setIsAccountMenuOpen(false);
+      setIsNavigationOpen(false);
     };
     window.addEventListener(SESSION_CHANGED_EVENT, refreshSession);
     window.addEventListener("storage", refreshSession);
@@ -31,91 +46,78 @@ function Navbar() {
   }, []);
 
   useEffect(() => {
-    if (!isAccountMenuOpen) return;
-
+    if (!isAccountMenuOpen && !isNavigationOpen) return;
     const handlePointerDown = (event: PointerEvent) => {
-      if (event.target instanceof Node && !accountMenuRef.current?.contains(event.target)) {
+      if (!(event.target instanceof Node)) return;
+      if (!accountMenuRef.current?.contains(event.target))
         setIsAccountMenuOpen(false);
-      }
+      if (
+        !navigationRef.current?.contains(event.target) &&
+        !navigationButtonRef.current?.contains(event.target)
+      )
+        setIsNavigationOpen(false);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsAccountMenuOpen(false);
-        accountButtonRef.current?.focus();
-      }
+      if (event.key !== "Escape") return;
+      if (isAccountMenuOpen) accountButtonRef.current?.focus();
+      else if (isNavigationOpen) navigationButtonRef.current?.focus();
+      setIsAccountMenuOpen(false);
+      setIsNavigationOpen(false);
     };
-
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isAccountMenuOpen]);
+  }, [isAccountMenuOpen, isNavigationOpen]);
 
-  const handleLogout = () => {
-    clearSession();
+  const closeMenus = () => {
+    setIsNavigationOpen(false);
     setIsAccountMenuOpen(false);
-    navigate("/login", { replace: true });
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 shadow-sm backdrop-blur-md">
-      <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        {/* Logo + Name */}
-        <Link to="/" className="flex items-center gap-3">
-          <img
-            src={logo}
-            alt="HCMUTE Logo"
-            className="h-16 w-16 shrink-0 object-contain"
-          />
-          <div className="hidden sm:block">
-            <p className="text-xs font-bold uppercase tracking-wide text-[#0B1F3A]">
-              HCMC University of Technology and Engineering
-            </p>
-            <p className="text-lg font-extrabold text-[#0B1F3A]">
-              SmartQueue
-            </p>
+    <header className="sq-header">
+      <a href="#main-content" className="sq-skip-link">
+        Skip to content
+      </a>
+      <div className="sq-container sq-header-inner">
+        <Link
+          to="/"
+          className="sq-brand"
+          onClick={closeMenus}
+          aria-label="SmartQueue home"
+        >
+          <img src={logo} alt="HCMUTE" width="48" height="48" />
+          <div>
+            <span>
+              Smart<span className="sq-brand-accent">Queue</span>
+              <span className="sq-brand-period">.</span>
+            </span>
+            <small>HCMUTE STUDENT SERVICES</small>
           </div>
         </Link>
-
-        {/* Navigation */}
-        <nav className="hidden items-center gap-6 md:flex">
+        <nav aria-label="Main navigation" className="sq-desktop-nav">
           {navItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
-              className={({ isActive }) =>
-                `text-sm font-semibold transition-colors ${
-                  isActive
-                    ? "text-blue-700"
-                    : "text-slate-600 hover:text-blue-700"
-                }`
-              }
+              end={item.path === "/"}
+              className={({ isActive }) => (isActive ? "is-active" : "")}
             >
               {item.label}
             </NavLink>
           ))}
         </nav>
-
-        {/* Right */}
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            aria-label="Notifications"
-            className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-[#0B1F3A]"
-          >
-            <Bell size={20} />
-          </button>
-
+        <div className="sq-header-actions">
           {session ? (
             <div
               ref={accountMenuRef}
-              className="relative min-w-0"
+              className="sq-account"
               onBlur={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget)) {
+                if (!event.currentTarget.contains(event.relatedTarget))
                   setIsAccountMenuOpen(false);
-                }
               }}
             >
               <button
@@ -123,53 +125,85 @@ function Navbar() {
                 type="button"
                 aria-expanded={isAccountMenuOpen}
                 aria-controls="account-dropdown"
-                onClick={() => setIsAccountMenuOpen((open) => !open)}
-                className="flex min-w-0 items-center gap-2 rounded-full bg-[#0B1F3A] px-3 py-2.5 text-sm font-medium text-white transition hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 sm:px-5"
+                onClick={() => {
+                  setIsAccountMenuOpen((open) => !open);
+                  setIsNavigationOpen(false);
+                }}
+                className="sq-account-button"
                 title={`Hello ${session.user.fullName}`}
               >
-                <UserRound size={16} className="shrink-0" />
-                <span className="max-w-32 truncate lg:max-w-48">
-                  Hello {session.user.fullName}
-                </span>
-                <ChevronDown size={16} className={`shrink-0 transition-transform ${isAccountMenuOpen ? "rotate-180" : ""}`} />
+                <UserRound size={17} aria-hidden="true" />
+                <span>{session.user.fullName}</span>
+                <ChevronDown size={15} aria-hidden="true" />
               </button>
               {isAccountMenuOpen && (
-                <div
-                  id="account-dropdown"
-                  className="absolute right-0 top-full mt-2 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg"
-                >
+                <div id="account-dropdown" className="sq-account-dropdown">
                   <button
                     type="button"
-                    onClick={handleLogout}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50 focus-visible:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-600"
+                    onClick={() => {
+                      clearSession();
+                      navigate("/login", { replace: true });
+                    }}
                   >
-                    <LogOut size={16} />
-                    Logout
+                    <LogOut size={16} aria-hidden="true" /> Sign out
                   </button>
                 </div>
               )}
             </div>
           ) : (
-            <Link
-              to="/login"
-              className="flex items-center gap-2 rounded-full bg-[#0B1F3A] px-3 py-2.5 text-sm font-medium text-white transition hover:bg-blue-800 sm:px-5"
-            >
-              <LogIn size={16} />
-              Sign in
+            <Link to="/login" className="sq-sign-in" onClick={closeMenus}>
+              Sign in <ArrowUpRight size={17} aria-hidden="true" />
             </Link>
           )}
-
           <button
+            ref={navigationButtonRef}
             type="button"
-            aria-label="Open navigation menu"
-            className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 md:hidden"
+            aria-label={
+              isNavigationOpen
+                ? "Close navigation menu"
+                : "Open navigation menu"
+            }
+            aria-expanded={isNavigationOpen}
+            aria-controls="mobile-navigation"
+            className="sq-mobile-toggle"
+            onClick={() => {
+              setIsNavigationOpen((open) => !open);
+              setIsAccountMenuOpen(false);
+            }}
           >
-            <Menu size={20} />
+            {isNavigationOpen ? (
+              <X size={22} aria-hidden="true" />
+            ) : (
+              <Menu size={22} aria-hidden="true" />
+            )}
           </button>
         </div>
       </div>
+      {isNavigationOpen && (
+        <nav
+          ref={navigationRef}
+          id="mobile-navigation"
+          aria-label="Mobile navigation"
+          className="sq-mobile-nav"
+        >
+          {navItems.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.path === "/"}
+              onClick={closeMenus}
+              className={({ isActive }) => (isActive ? "is-active" : "")}
+            >
+              {item.label}
+              <ArrowUpRight size={16} aria-hidden="true" />
+            </NavLink>
+          ))}
+          <a href="/#how-it-works" onClick={closeMenus}>
+            How it works
+            <ArrowUpRight size={16} aria-hidden="true" />
+          </a>
+        </nav>
+      )}
     </header>
   );
 }
-
-export default Navbar;

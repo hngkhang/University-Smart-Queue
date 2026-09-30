@@ -1,174 +1,429 @@
-import { Search, Grid, Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
+import {
+  ArrowDown,
+  ArrowRight,
+  ArrowUpRight,
+  CalendarDays,
+  Check,
+  ChevronRight,
+  CircleHelp,
+  Search,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router";
 import DepartmentCard from "../components/DepartmentCard";
+import StudentActivity from "../components/StudentActivity";
 import { fetchDepartments } from "../services/departments";
 import type { Department } from "../types";
+import campusImage from "../assets/campus-landing.webp";
 
-function HomePage() {
+const normalize = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/gi, "d")
+    .toLowerCase()
+    .trim();
+const steps = [
+  {
+    icon: Search,
+    title: "Find your service",
+    text: "Explore departments and choose the service you need.",
+  },
+  {
+    icon: CalendarDays,
+    title: "Choose your way",
+    text: "Join an available queue or book an appointment for another day.",
+  },
+  {
+    icon: Check,
+    title: "Keep track of your visit",
+    text: "Check your queue position or find your appointment details in one place.",
+  },
+];
+
+export default function HomePage() {
   const [search, setSearch] = useState("");
+  const [openOnly, setOpenOnly] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [retry, setRetry] = useState(0);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const loadDepartments = async () => {
-      try {
-        setIsLoading(true);
-        setError("");
-
-        const data = await fetchDepartments();
-
-        if (isMounted) {
-          setDepartments(data);
-        }
-      } catch (loadError) {
-        if (isMounted) {
+    let active = true;
+    fetchDepartments()
+      .then((data) => {
+        if (active) setDepartments(data);
+      })
+      .catch(() => {
+        if (active)
           setError(
-            loadError instanceof Error
-              ? loadError.message
-              : "Unable to load departments right now.",
+            "We couldn't connect to the department service. Please try again.",
           );
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void loadDepartments();
-
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
     return () => {
-      isMounted = false;
+      active = false;
     };
-  }, []);
+  }, [retry]);
 
+  const keyword = normalize(search);
   const filteredDepartments = departments.filter((department) => {
-    const keyword = search.toLowerCase();
-
-    return (
-      department.name.toLowerCase().includes(keyword) ||
-      department.vietnameseName.toLowerCase().includes(keyword) ||
-      department.services.some((service) =>
-        service.toLowerCase().includes(keyword),
-      )
-    );
+    const matchesSearch = [
+      department.name,
+      department.vietnameseName,
+      department.description,
+      ...department.services,
+    ].some((value) => normalize(value).includes(keyword));
+    return matchesSearch && (!openOnly || department.status === "open");
   });
+  // Suggest actual services rather than advertising services that may not exist.
+  const suggestions = [
+    ...new Set(
+      departments
+        .map((department) =>
+          department.services.find(
+            (service) => normalize(service) !== "general",
+          ),
+        )
+        .filter((service): service is string => Boolean(service)),
+    ),
+  ].slice(0, 4);
 
-  const scrollToServices = () => {
-    document.getElementById("services-section")?.scrollIntoView({ behavior: "smooth" });
+  const focusSearch = () => {
+    document
+      .getElementById("find-service")
+      ?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "instant"
+          : "smooth",
+        block: "start",
+      });
+    searchRef.current?.focus({ preventScroll: true });
   };
 
   return (
-    <main className="min-h-screen bg-slate-100 pb-20">
-      {/* Top Dashboard Header */}
-      <section className="bg-blue-50 border-b border-blue-200">
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-            
-            {/* Left side: Intro & Search */}
-            <div className="lg:col-span-7">
-              <h1 className="text-3xl font-bold tracking-tight text-indigo-950 sm:text-4xl">
-                Student Service System
-              </h1>
-              <p className="mt-4 text-lg text-slate-700">
-                Quickly look up information
-              </p>
-
-              <div className="mt-8 max-w-xl relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                  <Search className="h-5 w-5 text-slate-400" />
-                </div>
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search departments or services..."
-                  className="w-full rounded-md border border-blue-300 bg-white py-3 pl-11 pr-4 text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 text-base shadow-sm"
-                />
+    <main className="sq-home">
+      <section className="sq-hero" aria-labelledby="hero-heading">
+        <div className="sq-container sq-hero-grid">
+          <div className="sq-hero-copy">
+            <p className="sq-eyebrow">
+              <span className="sq-eyebrow-line" /> YOUR CAMPUS. YOUR TIME.
+            </p>
+            <h1 id="hero-heading">
+              Student services,
+              <br />
+              on <span>your schedule.</span>
+            </h1>
+            <p className="sq-hero-description">
+              A little less waiting. A little more campus life. Find the right
+              department, join a queue, or plan your next visit with SmartQueue.
+            </p>
+            <div className="sq-hero-actions">
+              <button
+                className="sq-button sq-button-primary"
+                onClick={focusSearch}
+              >
+                Explore services <ArrowUpRight size={18} aria-hidden="true" />
+              </button>
+              <Link
+                className="sq-button sq-button-secondary"
+                to="/appointments/new"
+              >
+                <CalendarDays size={18} aria-hidden="true" /> Book an
+                appointment
+              </Link>
+            </div>
+            <div className="sq-hero-notes">
+              <span>
+                <Check size={15} aria-hidden="true" /> Find your department
+              </span>
+              <span>
+                <Check size={15} aria-hidden="true" /> Plan ahead
+              </span>
+              <span>
+                <Check size={15} aria-hidden="true" /> Track your queue
+              </span>
+            </div>
+          </div>
+          <div className="sq-campus-visual">
+            <div className="sq-campus-frame">
+              <img
+                src={campusImage}
+                alt="The tree-lined entrance to the HCMUTE campus"
+                width="1000"
+                height="810"
+                fetchPriority="high"
+              />
+              <div className="sq-campus-overlay" />
+              <span className="sq-campus-tag">
+                <span /> CONNECTED CAMPUS
+              </span>
+              <div className="sq-campus-caption">
+                <span>MORE TIME FOR WHAT MATTERS</span>
+                <p>
+                  Your next chapter.
+                  <br />
+                  One less thing to wait for.
+                </p>
               </div>
             </div>
-
-            {/* Right side: 2 Quick Buttons */}
-            <div className="lg:col-span-5 flex flex-col gap-3 lg:items-end justify-center">
-              <div className="w-full max-w-sm flex flex-col gap-3">
-                <button 
-                  onClick={scrollToServices}
-                  className="flex items-center gap-3 rounded-md border border-blue-200 bg-white p-3 text-left transition hover:border-blue-400 hover:shadow-md"
-                >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-blue-100 text-blue-700">
-                    <Grid size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-indigo-950">View Services</h3>
-                    <p className="text-xs text-slate-500">Browse all departments</p>
-                  </div>
-                </button>
-                
-                <button 
-                  className="flex items-center gap-3 rounded-md border border-blue-200 bg-white p-3 text-left transition hover:border-blue-400 hover:shadow-md"
-                >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-indigo-100 text-indigo-700">
-                    <Sparkles size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-indigo-950">Chat with AI</h3>
-                    <p className="text-xs text-slate-500">Ask questions instantly</p>
-                  </div>
-                </button>
+            <div className="sq-campus-note">
+              <span className="sq-note-icon">
+                <CalendarDays size={23} aria-hidden="true" />
+              </span>
+              <div>
+                <strong>A smoother campus day</strong>
+                <span>Your services, all in one place.</span>
               </div>
+              <ArrowUpRight size={19} aria-hidden="true" />
             </div>
-            
+            <span className="sq-visual-index" aria-hidden="true">
+              01 / CAMPUS LIFE, SIMPLIFIED
+            </span>
           </div>
         </div>
       </section>
 
-      {/* Departments Section */}
-      <section id="services-section" className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
-        <div className="mb-10 flex flex-col items-start justify-between gap-4 border-b border-slate-200 pb-6 sm:flex-row sm:items-end">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">Departments</h2>
-            <p className="mt-2 text-sm text-slate-500 sm:text-base">
-              Showing {filteredDepartments.length} available departments
+      <div className="sq-container">
+        <section
+          id="find-service"
+          className="sq-search-panel"
+          aria-labelledby="search-heading"
+        >
+          <div className="sq-search-heading">
+            <div>
+              <span className="sq-section-kicker">LET'S GET YOU STARTED</span>
+              <h2 id="search-heading">What can we help you with?</h2>
+            </div>
+            <ArrowDown size={23} aria-hidden="true" />
+          </div>
+          <form
+            role="search"
+            onSubmit={(event) => {
+              event.preventDefault();
+              document.getElementById("services-heading")?.focus();
+            }}
+          >
+            <label className="sr-only" htmlFor="service-search">
+              Search departments or services
+            </label>
+            <div className="sq-search-field">
+              <Search size={22} aria-hidden="true" />
+              <input
+                ref={searchRef}
+                id="service-search"
+                type="search"
+                autoComplete="off"
+                placeholder="Try a service, like transcripts or tuition..."
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                aria-controls="department-results"
+              />
+              {search && (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  onClick={() => {
+                    setSearch("");
+                    searchRef.current?.focus();
+                  }}
+                >
+                  <X size={18} aria-hidden="true" />
+                </button>
+              )}
+              <button type="submit" className="sq-search-submit">
+                Search <ArrowRight size={17} aria-hidden="true" />
+              </button>
+            </div>
+          </form>
+          {suggestions.length > 0 && (
+            <div className="sq-suggestions">
+              <span>Quick picks</span>
+              {suggestions.map((service) => (
+                <button
+                  key={service}
+                  onClick={() => setSearch(service)}
+                  aria-pressed={search === service}
+                >
+                  {service}
+                  <ArrowUpRight size={12} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <StudentActivity />
+
+        <section
+          id="services-section"
+          className="sq-services"
+          aria-labelledby="services-heading"
+        >
+          <div className="sq-section-header">
+            <div>
+              <p className="sq-section-kicker">THE RIGHT SUPPORT, RIGHT HERE</p>
+              <h2 id="services-heading" tabIndex={-1}>
+                Meet your departments<span className="sq-heading-dot">.</span>
+              </h2>
+              <p>
+                Find the people and services that keep your campus life moving.
+              </p>
+            </div>
+            <a href="#how-it-works" className="sq-text-link">
+              How it works <ArrowDown size={15} aria-hidden="true" />
+            </a>
+          </div>
+          <div className="sq-filter-row">
+            <div className="sq-filter-buttons" aria-label="Filter departments">
+              <button
+                aria-pressed={!openOnly}
+                className={!openOnly ? "is-active" : ""}
+                onClick={() => setOpenOnly(false)}
+              >
+                All departments
+              </button>
+              <button
+                aria-pressed={openOnly}
+                className={openOnly ? "is-active" : ""}
+                onClick={() => setOpenOnly(true)}
+              >
+                <span className="sq-status-dot" />
+                Accepting queues
+              </button>
+            </div>
+            <p role="status" aria-live="polite">
+              {isLoading
+                ? "Loading departments..."
+                : error
+                  ? "Departments unavailable"
+                  : `${filteredDepartments.length} ${filteredDepartments.length === 1 ? "department" : "departments"}${keyword ? ` matching “${search.trim()}”` : " to explore"}`}
             </p>
+          </div>
+          <div id="department-results" aria-busy={isLoading}>
+            {isLoading ? (
+              <div
+                className="sq-department-grid"
+                aria-label="Loading departments"
+              >
+                {[0, 1, 2].map((item) => (
+                  <div key={item} className="sq-skeleton" aria-hidden="true">
+                    <div />
+                    <div />
+                    <div />
+                    <div />
+                  </div>
+                ))}
+              </div>
+            ) : error ? (
+              <div className="sq-empty" role="alert">
+                <CircleHelp size={30} aria-hidden="true" />
+                <h3>We couldn't load the departments</h3>
+                <p>{error}</p>
+                <button
+                  className="sq-button sq-button-primary"
+                  onClick={() => {
+                    setError("");
+                    setIsLoading(true);
+                    setRetry((value) => value + 1);
+                  }}
+                >
+                  Try again <ArrowRight size={16} aria-hidden="true" />
+                </button>
+              </div>
+            ) : filteredDepartments.length > 0 ? (
+              <div className="sq-department-grid">
+                {filteredDepartments.map((department) => (
+                  <DepartmentCard key={department.id} department={department} />
+                ))}
+              </div>
+            ) : (
+              <div className="sq-empty">
+                <SlidersHorizontal size={30} aria-hidden="true" />
+                <h3>
+                  {departments.length === 0
+                    ? "Departments are on their way"
+                    : "No matching departments"}
+                </h3>
+                <p>
+                  {departments.length === 0
+                    ? "Please check back soon for available student services."
+                    : "Try another service name or view all departments."}
+                </p>
+                {(search || openOnly) && (
+                  <button
+                    className="sq-button sq-button-secondary"
+                    onClick={() => {
+                      setSearch("");
+                      setOpenOnly(false);
+                    }}
+                  >
+                    Clear filters <X size={16} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="sq-booking-banner">
+            <div className="sq-booking-icon">
+              <CalendarDays size={25} aria-hidden="true" />
+            </div>
+            <div>
+              <h3>A busy week ahead?</h3>
+              <p>
+                Find an available appointment and make room for what matters.
+              </p>
+            </div>
+            <Link to="/appointments/new" className="sq-text-link">
+              Plan your visit <ArrowRight size={18} aria-hidden="true" />
+            </Link>
+          </div>
+        </section>
+      </div>
+
+      <section
+        id="how-it-works"
+        className="sq-guide"
+        aria-labelledby="guide-heading"
+      >
+        <div className="sq-container">
+          <div className="sq-guide-header">
+            <div>
+              <p className="sq-section-kicker">SIMPLE FROM THE START</p>
+              <h2 id="guide-heading">Your next visit, in three steps.</h2>
+            </div>
+            <p>
+              Less figuring things out.
+              <br />
+              More getting things done.
+            </p>
+          </div>
+          <ol className="sq-guide-grid">
+            {steps.map((step, index) => (
+              <li key={step.title}>
+                <div className="sq-step-top">
+                  <step.icon size={25} aria-hidden="true" />
+                  <span>0{index + 1}</span>
+                </div>
+                <h3>{step.title}</h3>
+                <p>{step.text}</p>
+              </li>
+            ))}
+          </ol>
+          <div className="sq-guide-bottom">
+            <span>Ready when you are.</span>
+            <button onClick={focusSearch}>
+              Find your service <ChevronRight size={18} aria-hidden="true" />
+            </button>
           </div>
         </div>
-
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center rounded-md bg-white py-32 border border-slate-200">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600"></div>
-            <h3 className="mt-4 font-semibold text-slate-800">Loading departments...</h3>
-          </div>
-        ) : error ? (
-          <div className="rounded-md bg-red-50 py-16 text-center border border-red-100">
-            <h3 className="text-lg font-bold text-red-800">Unable to load data</h3>
-            <p className="mt-2 text-sm text-red-600">{error}</p>
-          </div>
-        ) : filteredDepartments.length > 0 ? (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filteredDepartments.map((department) => (
-              <DepartmentCard
-                key={department.id}
-                department={department}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-md bg-white py-32 text-center border border-slate-200">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-md bg-slate-50">
-              <Search className="h-8 w-8 text-slate-300" />
-            </div>
-            <h3 className="mt-4 text-lg font-bold text-slate-800">No departments found</h3>
-            <p className="mt-2 text-sm text-slate-500">
-              Please try searching with a different keyword.
-            </p>
-          </div>
-        )}
       </section>
     </main>
   );
 }
-
-export default HomePage;
