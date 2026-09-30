@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router";
+import { Route, Routes, useLocation } from "react-router";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import DepartmentPage from "./pages/DepartmentPage";
@@ -9,8 +9,13 @@ import BookAppointmentPage from "./pages/BookAppointmentPage";
 import AppointmentsPage from "./pages/AppointmentsPage";
 import StudentAccess from "./components/StudentAccess";
 import MyQueuePage from "./pages/MyQueuePage";
+import StaffWorkspace from "./pages/StaffWorkspace";
 
 function App() {
+  const { pathname } = useLocation();
+  if (pathname === "/staff" || pathname.startsWith("/staff/")) {
+    return <StaffWorkspace />;
+  }
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <Navbar />

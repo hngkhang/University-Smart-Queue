@@ -138,6 +138,11 @@ export default function Navbar() {
               </button>
               {isAccountMenuOpen && (
                 <div id="account-dropdown" className="sq-account-dropdown">
+                  {session.user.role === "staff" && (
+                    <Link to="/staff" className="sq-staff-link" onClick={closeMenus}>
+                      <UserRound size={16} aria-hidden="true" /> Staff workspace
+                    </Link>
+                  )}
                   <button
                     type="button"
                     onClick={() => {

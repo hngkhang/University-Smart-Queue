@@ -38,6 +38,7 @@ type LoginResponse = {
 };
 
 const getRedirectPath = (userRole: LoginResponse["user"]["role"]) => {
+  if (userRole === "staff") return "/staff";
   if (userRole === "student") {
     return "/queue";
   }
@@ -99,7 +100,8 @@ function LoginPage() {
       window.setTimeout(() => {
         const redirect = searchParams.get("redirect");
         const safeRedirect = redirect && /^\/(?:appointments(?:\/new)?|queue|departments\/[a-f\d]{24})(?:\?[^#]*)?$/i.test(redirect);
-        navigate(safeRedirect && authenticatedUser.role === "student" ? redirect : getRedirectPath(authenticatedUser.role));
+        const staffRedirect = authenticatedUser.role === "staff" && (redirect === "/staff" || redirect === "/staff/history");
+        navigate(staffRedirect || (safeRedirect && authenticatedUser.role === "student") ? redirect! : getRedirectPath(authenticatedUser.role));
       }, 700);
     } catch (error) {
       const message =

@@ -4,3 +4,4 @@ dist/
 .env.*
 !.env.example
 *.log
+QUEUE_BOOKING_UI_REVIEW.md

@@ -5,6 +5,7 @@ export interface SessionUser {
   role: "student" | "staff" | "admin";
   studentID: string;
   phone: string;
+  department?: string | null;
 }
 
 export const SESSION_CHANGED_EVENT = "smartqueue:session-changed";
