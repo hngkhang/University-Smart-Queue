@@ -8,20 +8,7 @@ const router = express.Router();
 
 const { DEFAULT_WORKING_HOURS } = require("../lib/appointmentSchedule");
 
-const formatLocation = (location) => {
-  if (!location || typeof location !== "object") {
-    return "HCMUTE Campus";
-  }
-
-  const hasCoordinates =
-    typeof location.x === "number" && typeof location.y === "number";
-
-  if (!hasCoordinates) {
-    return "HCMUTE Campus";
-  }
-
-  return `HCMUTE Campus (${location.x}, ${location.y})`;
-};
+const formatLocation = require("../lib/officeLocation");
 
 const getStatus = (department, queue) => {
   if (!department.isActive || !queue?.isOpen) {
@@ -82,7 +69,7 @@ router.get("/", async (_req, res) => {
       });
     }
 
-    const departments = await Department.find({})
+    const departments = await Department.find({ isArchived: { $ne: true } })
       .sort({ name: 1 })
       .lean();
     const queueByDepartment = await getQueuesByDepartment(

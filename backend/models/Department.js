@@ -19,6 +19,7 @@ const serviceSchema = new mongoose.Schema(
 
 const locationSchema = new mongoose.Schema(
   {
+    label: { type: String, trim: true, default: "" },
     x: {
       type: Number,
       default: 0,
@@ -54,6 +55,7 @@ const departmentSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    isArchived: { type: Boolean, default: false },
     staff: {
       type: [String],
       default: [],

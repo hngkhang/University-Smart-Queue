@@ -1,0 +1,222 @@
+[
+  {
+    "_id": {
+      "$oid": "6d0000000000000000000101"
+    },
+    "name": "Faculty of Advanced Education",
+    "vietnameseName": "Khoa Đào tạo Chất lượng cao (FAE)",
+    "description": "Hỗ trợ sinh viên FAE về chương trình học, đăng ký học phần và hồ sơ học tập.",
+    "isActive": true,
+    "isArchived": false,
+    "staff": [
+      "6d0000000000000000000201"
+    ],
+    "services": [
+      {
+        "name": "Program Consultation",
+        "estimatedDuration": 15
+      },
+      {
+        "name": "Course Registration Guidance",
+        "estimatedDuration": 10
+      },
+      {
+        "name": "Internship Document Support",
+        "estimatedDuration": 10
+      },
+      {
+        "name": "Graduation Requirement Consultation",
+        "estimatedDuration": 15
+      }
+    ],
+    "location": {
+      "label": "F1-309"
+    },
+    "workingHours": "07:30 - 11:30 | 13:00 - 16:30",
+    "bookingEnabled": true,
+    "bookingWeekdays": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "bookingExcludedDates": []
+  },
+  {
+    "_id": {
+      "$oid": "6aa790376d5173ac06e23012"
+    },
+    "name": "Academic Affairs Office",
+    "vietnameseName": "Phòng Đào tạo",
+    "description": "Hỗ trợ bảng điểm, xác nhận sinh viên, điều chỉnh thông tin và các vấn đề học vụ.",
+    "isActive": true,
+    "isArchived": false,
+    "staff": [
+      "6aa790376d5173ac06e2300f"
+    ],
+    "services": [
+      {
+        "name": "Transcript Request",
+        "estimatedDuration": 10
+      },
+      {
+        "name": "Student Confirmation",
+        "estimatedDuration": 10
+      },
+      {
+        "name": "Information Correction",
+        "estimatedDuration": 15
+      },
+      {
+        "name": "Course-related Support",
+        "estimatedDuration": 15
+      }
+    ],
+    "location": {
+      "label": "A1-201 / A1-202"
+    },
+    "workingHours": "07:30 - 11:30 | 13:00 - 16:30",
+    "bookingEnabled": true,
+    "bookingWeekdays": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "bookingExcludedDates": []
+  },
+  {
+    "_id": {
+      "$oid": "6d0000000000000000000102"
+    },
+    "name": "Student Affairs Office",
+    "vietnameseName": "Phòng Công tác Sinh viên",
+    "description": "Hỗ trợ chính sách sinh viên, học bổng, hồ sơ và xác nhận hoạt động sinh viên.",
+    "isActive": true,
+    "isArchived": false,
+    "staff": [
+      "6d0000000000000000000202"
+    ],
+    "services": [
+      {
+        "name": "Scholarship Consultation",
+        "estimatedDuration": 15
+      },
+      {
+        "name": "Student Policy Support",
+        "estimatedDuration": 15
+      },
+      {
+        "name": "Student Profile Update",
+        "estimatedDuration": 10
+      },
+      {
+        "name": "Student Activity Confirmation",
+        "estimatedDuration": 10
+      }
+    ],
+    "location": {
+      "label": "A1-203 / A1-204"
+    },
+    "workingHours": "07:30 - 11:30 | 13:00 - 16:30",
+    "bookingEnabled": true,
+    "bookingWeekdays": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "bookingExcludedDates": []
+  },
+  {
+    "_id": {
+      "$oid": "6aa790376d5173ac06e23013"
+    },
+    "name": "Finance & Accounting Office",
+    "vietnameseName": "Phòng Kế hoạch Tài chính",
+    "description": "Tra cứu học phí, xác nhận thanh toán và hỗ trợ điều chỉnh thông tin tài chính; không xử lý thanh toán trực tuyến.",
+    "isActive": true,
+    "isArchived": false,
+    "staff": [
+      "6aa790376d5173ac06e23010"
+    ],
+    "services": [
+      {
+        "name": "Tuition Fee Inquiry",
+        "estimatedDuration": 10
+      },
+      {
+        "name": "Tuition Payment Confirmation",
+        "estimatedDuration": 10
+      },
+      {
+        "name": "Financial Clearance",
+        "estimatedDuration": 9
+      },
+      {
+        "name": "Billing Correction",
+        "estimatedDuration": 15
+      }
+    ],
+    "location": {
+      "label": "A1-102"
+    },
+    "workingHours": "07:30 - 11:30 | 13:00 - 16:30",
+    "bookingEnabled": true,
+    "bookingWeekdays": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "bookingExcludedDates": []
+  },
+  {
+    "_id": {
+      "$oid": "6d0000000000000000000103"
+    },
+    "name": "Medical Station",
+    "vietnameseName": "Trạm Y tế",
+    "description": "Tiếp nhận các lượt hẹn thông thường về tư vấn sức khỏe, bảo hiểm và hồ sơ y tế.",
+    "isActive": true,
+    "isArchived": false,
+    "staff": [
+      "6d0000000000000000000203"
+    ],
+    "services": [
+      {
+        "name": "Health Consultation",
+        "estimatedDuration": 15
+      },
+      {
+        "name": "Health Insurance Guidance",
+        "estimatedDuration": 10
+      },
+      {
+        "name": "Medical Document Support",
+        "estimatedDuration": 10
+      },
+      {
+        "name": "Health Check Guidance",
+        "estimatedDuration": 15
+      }
+    ],
+    "location": {
+      "label": "Khu B"
+    },
+    "workingHours": "07:30 - 11:30 | 13:00 - 16:30",
+    "bookingEnabled": true,
+    "bookingWeekdays": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "bookingExcludedDates": []
+  }
+]

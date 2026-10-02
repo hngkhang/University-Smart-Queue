@@ -6,3 +6,4 @@ dist/
 *.log
 QUEUE_BOOKING_UI_REVIEW.md
 ADMIN_WORKSPACE.md
+backend/manual-data/backups/

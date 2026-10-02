@@ -4,6 +4,7 @@ const Department = require("../models/Department");
 const Queue = require("../models/Queue");
 const QueueTicket = require("../models/QueueTicket");
 const QueueSequence = require("../models/QueueSequence");
+const officeLocation = require("../lib/officeLocation");
 const studentAuth = require("../middleware/studentAuth");
 
 const router = express.Router();
@@ -36,9 +37,7 @@ async function ticketResponse(ticket) {
   return {
     ...ticket,
     reference: `Q-${String(ticket.number).padStart(3, "0")}`,
-    location: department?.location
-      ? `HCMUTE Campus (${department.location.x}, ${department.location.y})`
-      : "HCMUTE Campus",
+    location: officeLocation(department?.location),
     queueStatus:
       !department?.isActive || !queue?.isOpen
         ? "closed"

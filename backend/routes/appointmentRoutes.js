@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const Appointment = require("../models/Appointment");
 const Department = require("../models/Department");
 const studentAuth = require("../middleware/studentAuth");
+const officeLocation = require("../lib/officeLocation");
 const { validBookingDate, slotsFor, reservedMinutes } = require("../lib/appointmentSchedule");
 
 const router = express.Router();
@@ -83,8 +84,7 @@ router.post("/", async (req, res) => {
       student: req.student._id,
       department: department._id,
       departmentName: department.name,
-      location: department.location
-        ? `HCMUTE Campus (${department.location.x}, ${department.location.y})` : "HCMUTE Campus",
+      location: officeLocation(department.location),
       services,
       estimatedServiceTime: duration,
       ...slot,

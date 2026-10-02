@@ -1,0 +1,128 @@
+[
+  {
+    "_id": {
+      "$oid": "6d0000000000000000000201"
+    },
+    "fullName": "FAE Staff Demo",
+    "email": "fae.staff@example.com",
+    "password": "$2b$12$1K1UCnTzOIZHyTH4ZmhHJuLGPWIbFROB4aJHUJUN4Gp5msCyvG1im",
+    "role": "staff",
+    "department": {
+      "$oid": "6d0000000000000000000101"
+    },
+    "studentID": "",
+    "phone": "",
+    "isActive": true,
+    "sessionVersion": 0,
+    "passwordRequests": []
+  },
+  {
+    "_id": {
+      "$oid": "6d0000000000000000000202"
+    },
+    "fullName": "Student Affairs Staff Demo",
+    "email": "studentaffairs.staff@example.com",
+    "password": "$2b$12$ulzn/QW7A/oz3MdgC/wEsuCrQzrU/meikgnxVZWfiGj84LuVMLnSi",
+    "role": "staff",
+    "department": {
+      "$oid": "6d0000000000000000000102"
+    },
+    "studentID": "",
+    "phone": "",
+    "isActive": true,
+    "sessionVersion": 0,
+    "passwordRequests": []
+  },
+  {
+    "_id": {
+      "$oid": "6d0000000000000000000203"
+    },
+    "fullName": "Medical Staff Demo",
+    "email": "medical.staff@example.com",
+    "password": "$2b$12$j8Kt3uj05g6at9nmhQsZWeCGB5IFMwhNeGR6Dy.Z5hxRixiudw.Xe",
+    "role": "staff",
+    "department": {
+      "$oid": "6d0000000000000000000103"
+    },
+    "studentID": "",
+    "phone": "",
+    "isActive": true,
+    "sessionVersion": 0,
+    "passwordRequests": []
+  },
+  {
+    "_id": {
+      "$oid": "6d0000000000000000000301"
+    },
+    "fullName": "Sinh viên FAE Demo An",
+    "email": "fae.student1@example.com",
+    "password": "$2b$12$wKDr6oHZQdax9jYsjkpVj.OzaHP3hNWw9/m2krjzNRgI7z64TSKTu",
+    "role": "student",
+    "department": null,
+    "studentID": "FAE-DEMO-001",
+    "phone": "",
+    "isActive": true,
+    "sessionVersion": 0,
+    "passwordRequests": []
+  },
+  {
+    "_id": {
+      "$oid": "6d0000000000000000000302"
+    },
+    "fullName": "Sinh viên FAE Demo Bình",
+    "email": "fae.student2@example.com",
+    "password": "$2b$12$BaIr78WSPbd4WppwdjUr2u9UCM9WYpgASP/mpOcuoe6moKLo4JKhS",
+    "role": "student",
+    "department": null,
+    "studentID": "FAE-DEMO-002",
+    "phone": "",
+    "isActive": true,
+    "sessionVersion": 0,
+    "passwordRequests": []
+  },
+  {
+    "_id": {
+      "$oid": "6d0000000000000000000303"
+    },
+    "fullName": "Sinh viên FAE Demo Chi",
+    "email": "fae.student3@example.com",
+    "password": "$2b$12$oOm8r3doa7Vy7na2xkF1q.dzUy.jQk.qBx7VpvJpG4euZmUCzwIXS",
+    "role": "student",
+    "department": null,
+    "studentID": "FAE-DEMO-003",
+    "phone": "",
+    "isActive": true,
+    "sessionVersion": 0,
+    "passwordRequests": []
+  },
+  {
+    "_id": {
+      "$oid": "6d0000000000000000000304"
+    },
+    "fullName": "Sinh viên FAE Demo Dũng",
+    "email": "fae.student4@example.com",
+    "password": "$2b$12$pd9lfcHBQPEjWXpTGv8K9us3jKLbzLoNFBTobUcaGpCaoB8xHaoJy",
+    "role": "student",
+    "department": null,
+    "studentID": "FAE-DEMO-004",
+    "phone": "",
+    "isActive": true,
+    "sessionVersion": 0,
+    "passwordRequests": []
+  },
+  {
+    "_id": {
+      "$oid": "6d0000000000000000000305"
+    },
+    "fullName": "Sinh viên FAE Demo Hà",
+    "email": "fae.student5@example.com",
+    "password": "$2b$12$bnOh5JFUBaQeu6Gs7hJQkuqa/MGjm2C4S13dqWzpjoemJg2VEQkJW",
+    "role": "student",
+    "department": null,
+    "studentID": "FAE-DEMO-005",
+    "phone": "",
+    "isActive": true,
+    "sessionVersion": 0,
+    "passwordRequests": []
+  }
+]
