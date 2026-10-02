@@ -2,7 +2,7 @@
 
 Run `npm install` and `npm run dev`. The existing `.env` needs `MONGODB_URI`
 and `JWT_SECRET`; `PORT` defaults to `5000`. The API starts after MongoDB
-connects and the ticket indexes are ready.
+connects and the ticket and appointment indexes are ready.
 
 The frontend uses `VITE_API_URL`, defaulting to `http://127.0.0.1:5000/api`.
 Department service names and durations come from the existing `departments`
@@ -39,6 +39,40 @@ Staff calling/serving/completing tickets, automatic no-show handling, session
 expiry, and appointment capacity integration are not part of these endpoints.
 Until those workflows exist, students can leave the queue by cancelling a
 waiting ticket. A saved ticket does not automatically expire at midnight.
+
+## Appointment booking
+
+All appointment endpoints require a Bearer JWT and an active student account.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/api/appointments/availability?departmentId=...&date=YYYY-MM-DD&services=Transcript&services=Verification` | Available intervals for all selected services |
+| POST | `/api/appointments` | Book with `departmentId`, `services` (name array), `date`, `startsAt` (ISO time), and optional `notes` |
+| GET | `/api/appointments` | List the student's saved appointments |
+| PATCH | `/api/appointments/:id/cancel` | Cancel a future confirmed appointment and release its time |
+
+One appointment covers services from one department in a single visit. Service
+names and positive integer durations are validated and snapshotted by the server;
+the reserved duration is their sum. Services without a configured duration cannot
+be booked. Responses include `services` with name/duration pairs and
+`estimatedServiceTime` in minutes.
+
+Booking uses Vietnam time, today through 30 days ahead, Monday to Friday by
+default. Department fields `bookingEnabled`, `bookingWeekdays` (Sunday = 0), and
+`bookingExcludedDates` override these rules. Hours use `HH:mm - HH:mm` periods
+separated by `|`; blank hours default to `07:30 - 11:30 | 13:00 - 16:30`.
+Malformed hours produce no slots. Starts occur every 15 minutes from each
+period's opening; the entire visit must fit before that period ends.
+
+Until counter scheduling exists, appointment capacity is one visit at a time per
+department. Unique MongoDB multikey indexes reserve each occupied minute in a
+single insert, preventing concurrent overlapping appointments for a department
+or student (including across departments). Adjacent visits are allowed.
+Cancellation removes the confirmed reservation from those indexes atomically.
+
+Booking is separate from live queue admission and does not create a queue ticket.
+Staff still uses its existing demo workspace; appointment check-in, staff handling,
+and shared capacity between walk-ins and appointments remain future work.
 
 ## Verification
 

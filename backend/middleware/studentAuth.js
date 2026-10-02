@@ -22,7 +22,7 @@ module.exports = async function studentAuth(req, res, next) {
   } catch {
     return res
       .status(401)
-      .json({ message: "Please sign in again to manage your queue." });
+      .json({ message: "Please sign in again to manage your visits." });
   }
   try {
     const user = await User.findById(payload.id).select("+sessionVersion").lean();
@@ -32,7 +32,7 @@ module.exports = async function studentAuth(req, res, next) {
       return res
         .status(403)
         .json({
-          message: "An active student account is required to join a queue.",
+          message: "An active student account is required to manage visits.",
         });
     }
     req.student = user;

@@ -23,7 +23,8 @@ export interface Appointment {
   reference: string;
   department: string;
   departmentName: string;
-  service: string;
+  services: { name: string; estimatedDuration: number }[];
+  estimatedServiceTime: number;
   location: string;
   startsAt: string;
   endsAt: string;

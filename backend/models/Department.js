@@ -71,6 +71,9 @@ const departmentSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    bookingEnabled: { type: Boolean, default: true },
+    bookingWeekdays: { type: [Number], default: [1, 2, 3, 4, 5] },
+    bookingExcludedDates: { type: [String], default: [] },
   },
   {
     collection: "departments",

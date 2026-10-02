@@ -36,7 +36,7 @@ export default function BookAppointmentPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [retry, setRetry] = useState(0);
-  const [service, setService] = useState("");
+  const [services, setServices] = useState<string[]>([]);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [notes, setNotes] = useState("");
@@ -53,10 +53,17 @@ export default function BookAppointmentPage() {
   const [unauthorized, setUnauthorized] = useState(false);
   const [success, setSuccess] = useState<Appointment | null>(null);
   const department = departments.find((item) => item.id === departmentId);
-  const selectedService = department?.services.includes(service) ? service : "";
-  const duration = department?.serviceDetails?.find(
-    (item) => item.name === selectedService,
-  )?.estimatedDuration;
+  const serviceOptions = department?.services.map((name) => ({
+    name,
+    estimatedDuration: department.serviceDetails?.find((item) => item.name === name)?.estimatedDuration ?? 0,
+  })) ?? [];
+  const selectedServices = serviceOptions.filter((item) => services.includes(item.name));
+  const hasDurations = selectedServices.length > 0 && selectedServices.every(
+    (item) => Number.isInteger(item.estimatedDuration) && item.estimatedDuration > 0,
+  );
+  const duration = hasDurations
+    ? selectedServices.reduce((sum, item) => sum + item.estimatedDuration, 0) : 0;
+  const servicesKey = JSON.stringify(selectedServices.map((item) => item.name));
   const bookingEnabled = department && department.bookingEnabled !== false;
   const today = todayInVietnam();
   const lastDate = new Date(`${today}T00:00:00Z`);
@@ -64,11 +71,11 @@ export default function BookAppointmentPage() {
   const maxDate = lastDate.toISOString().slice(0, 10);
   const availabilityKey = JSON.stringify([
     departmentId,
-    selectedService,
+    servicesKey,
     date,
     refresh,
   ]);
-  const readyToLoad = Boolean(bookingEnabled && selectedService && date);
+  const readyToLoad = Boolean(bookingEnabled && hasDurations && date);
   const slots = availability?.key === availabilityKey ? availability.slots : [];
   const slotsLoading = readyToLoad && availability?.key !== availabilityKey;
   const slotError =
@@ -106,7 +113,7 @@ export default function BookAppointmentPage() {
   useEffect(() => {
     if (!readyToLoad) return;
     const controller = new AbortController();
-    fetchAvailability(departmentId, selectedService, date, controller.signal)
+    fetchAvailability(departmentId, JSON.parse(servicesKey) as string[], date, controller.signal)
       .then((data) => {
         if (!controller.signal.aborted)
           setAvailability({ key: availabilityKey, slots: data.slots });
@@ -125,7 +132,7 @@ export default function BookAppointmentPage() {
           });
       });
     return () => controller.abort();
-  }, [departmentId, selectedService, date, availabilityKey, readyToLoad]);
+  }, [departmentId, servicesKey, date, availabilityKey, readyToLoad]);
 
   const clearSelection = () => {
     setTime("");
@@ -133,7 +140,7 @@ export default function BookAppointmentPage() {
   };
   async function submit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedSlot || !department || submitLock.current) return;
+    if (!selectedSlot || !department || !readyToLoad || submitLock.current) return;
     submitLock.current = true;
     setSubmitting(true);
     setError("");
@@ -141,7 +148,7 @@ export default function BookAppointmentPage() {
     try {
       const result = await createAppointment({
         departmentId,
-        service: selectedService,
+        services: selectedServices.map((item) => item.name),
         date,
         startsAt: selectedSlot.startsAt,
         notes,
@@ -185,7 +192,14 @@ export default function BookAppointmentPage() {
           </p>
           <div className="mt-7 rounded-xl bg-slate-50 p-5 text-left">
             <p className="font-bold text-slate-900">{success.departmentName}</p>
-            <p className="mt-1 text-sm text-slate-600">{success.service}</p>
+            <ul className="mt-2 space-y-1 text-sm text-slate-600">
+              {success.services.map((item) => (
+                <li key={item.name}>{item.name} · {item.estimatedDuration} min</li>
+              ))}
+            </ul>
+            <p className="mt-3 text-sm font-medium text-slate-700">
+              Total service time: {success.estimatedServiceTime} minutes
+            </p>
             <p className="mt-4 text-sm text-slate-700">
               {appointmentDate(success.startsAt)} ·{" "}
               {appointmentTime(success.startsAt)} –{" "}
@@ -259,10 +273,10 @@ export default function BookAppointmentPage() {
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-xs text-[#3F6392]">
                   1
                 </span>{" "}
-                Select your service
+                Select your services
               </h2>
-              <div className="mt-5 grid gap-5 sm:grid-cols-2">
-                <label className="text-sm font-semibold text-slate-700">
+              <div className="mt-5 space-y-5">
+                <label className="block text-sm font-semibold text-slate-700">
                   Department <span className="text-blue-700">*</span>
                   <select
                     required
@@ -274,7 +288,7 @@ export default function BookAppointmentPage() {
                           : {},
                         { replace: true },
                       );
-                      setService("");
+                      setServices([]);
                       setDate("");
                       clearSelection();
                     }}
@@ -298,26 +312,40 @@ export default function BookAppointmentPage() {
                     ))}
                   </select>
                 </label>
-                <label className="text-sm font-semibold text-slate-700">
-                  Service <span className="text-blue-700">*</span>
-                  <select
-                    required
-                    disabled={!bookingEnabled}
-                    value={selectedService}
-                    onChange={(event) => {
-                      setService(event.target.value);
-                      clearSelection();
-                    }}
-                    className={inputClass}
-                  >
-                    <option value="">Choose a service</option>
-                    {department?.services.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <fieldset disabled={!bookingEnabled} aria-describedby="booking-services-hint">
+                  <legend className="text-sm font-semibold text-slate-700">
+                    Services <span className="text-blue-700">*</span>
+                  </legend>
+                  <p id="booking-services-hint" className="mt-2 text-sm text-slate-500">
+                    Choose one or more services in this department for a single visit.
+                  </p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {serviceOptions.map((item) => {
+                      const available = Number.isInteger(item.estimatedDuration) && item.estimatedDuration > 0;
+                      const checked = services.includes(item.name);
+                      return (
+                        <label key={item.name} className={`flex items-start gap-3 rounded-xl border p-4 focus-within:ring-2 focus-within:ring-[#3F6392] ${!available ? "cursor-not-allowed border-slate-200 bg-slate-50" : checked ? "cursor-pointer border-[#3F6392] bg-[#F1F5FA]" : "cursor-pointer border-slate-200 hover:border-slate-400"}`}>
+                          <input type="checkbox" name="services" value={item.name}
+                            checked={checked} disabled={!available}
+                            onChange={() => {
+                              setServices((current) => checked ? current.filter((name) => name !== item.name) : [...current, item.name]);
+                              clearSelection();
+                            }}
+                            className="mt-1 h-4 w-4 shrink-0 accent-[#3F6392]" />
+                          <span className="min-w-0 text-sm">
+                            <span className="block font-semibold text-slate-700">{item.name}</span>
+                            <span className="mt-1 block text-xs text-slate-500">
+                              {available ? `About ${item.estimatedDuration} min` : "Booking unavailable — duration not configured"}
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-3 text-sm font-medium text-[#3F6392]" role="status" aria-atomic="true">
+                    {selectedServices.length} services selected{duration > 0 ? ` · ${duration} minutes total` : ""}
+                  </p>
+                </fieldset>
               </div>
               {departmentId && !bookingEnabled && (
                 <p className="mt-4 text-sm text-amber-700">
@@ -350,18 +378,18 @@ export default function BookAppointmentPage() {
                 </span>{" "}
                 Choose date & time
               </h2>
-              {duration && (
+              {duration > 0 && (
                 <p className="mt-2 text-sm text-slate-500">
-                  This service takes about {duration} minutes.
+                  Your selected services take about {duration} minutes in total.
                 </p>
               )}
-              {!selectedService || !bookingEnabled ? (
+              {!hasDurations || !bookingEnabled ? (
                 <div className="mt-5 rounded-xl border border-dashed border-slate-200 px-5 py-12 text-center text-sm text-slate-500">
                   <CalendarDays
                     className="mx-auto mb-3 text-slate-300"
                     size={30}
                   />
-                  Select a department and service to see available times.
+                  Select a department and services to see available times.
                 </div>
               ) : (
                 <div className="mt-5 grid gap-6 xl:grid-cols-2">
@@ -416,8 +444,8 @@ export default function BookAppointmentPage() {
                       </div>
                     ) : slots.length === 0 ? (
                       <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">
-                        No appointment times for this date. Please choose
-                        another day.
+                        No continuous time fits your selected services on this date.
+                        Choose another day or change your services.
                       </p>
                     ) : (
                       <>
@@ -527,10 +555,18 @@ export default function BookAppointmentPage() {
                 <p className="mt-1 font-semibold text-slate-800">
                   {department?.name || "Not selected"}
                 </p>
-                <p className="mt-4 text-xs text-slate-400">Service</p>
-                <p className="mt-1 text-sm font-medium text-slate-700">
-                  {selectedService || "Not selected"}
-                </p>
+                <p className="mt-4 text-xs text-slate-500">Services</p>
+                {selectedServices.length ? (
+                  <ul className="mt-2 space-y-2 text-sm font-medium text-slate-700">
+                    {selectedServices.map((item) => (
+                      <li key={item.name} className="flex justify-between gap-3">
+                        <span>{item.name}</span>
+                        <span className="shrink-0 text-slate-500">{item.estimatedDuration} min</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : <p className="mt-1 text-sm text-slate-500">Not selected</p>}
+                {duration > 0 && <p className="mt-3 text-sm font-semibold text-[#3F6392]">Total: {duration} minutes</p>}
               </div>
               <div className="space-y-4 rounded-xl bg-slate-50 p-4 text-sm">
                 <div className="flex gap-3">
@@ -579,7 +615,7 @@ export default function BookAppointmentPage() {
               )}
               <button
                 type="submit"
-                disabled={!selectedSlot || submitting || !bookingEnabled}
+                disabled={!selectedSlot || submitting || !readyToLoad}
                 className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[#3F6392] px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-[#2E4B72] disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 {submitting ? (

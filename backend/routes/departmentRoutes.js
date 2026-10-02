@@ -6,7 +6,7 @@ const QueueTicket = require("../models/QueueTicket");
 
 const router = express.Router();
 
-const DEFAULT_WORKING_HOURS = "07:30 - 11:30 | 13:00 - 16:30";
+const { DEFAULT_WORKING_HOURS } = require("../lib/appointmentSchedule");
 
 const formatLocation = (location) => {
   if (!location || typeof location !== "object") {
@@ -56,6 +56,9 @@ const mapDepartmentResponse = (department, queue, waitingCount = 0) => {
     })),
     location: formatLocation(department.location),
     workingHours: department.workingHours || DEFAULT_WORKING_HOURS,
+    bookingEnabled: department.isActive && department.bookingEnabled !== false,
+    bookingWeekdays: department.bookingWeekdays ?? [1, 2, 3, 4, 5],
+    bookingExcludedDates: department.bookingExcludedDates ?? [],
   };
 };
 

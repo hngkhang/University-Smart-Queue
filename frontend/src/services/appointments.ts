@@ -29,7 +29,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       ...options?.headers,
     },
   });
-  if (response.status === 404 || response.status === 501) {
+  if (response.status === 501) {
     throw new AppointmentError(
       "Appointment booking is not available yet. Please try again later.",
       response.status,
@@ -56,21 +56,24 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const fetchAvailability = (
   departmentId: string,
-  service: string,
+  services: string[],
   date: string,
   signal?: AbortSignal,
-) =>
-  request<{ slots: AppointmentSlot[] }>(
-    `/availability?${new URLSearchParams({ departmentId, service, date })}`,
+) => {
+  const params = new URLSearchParams({ departmentId, date });
+  services.forEach((name) => params.append("services", name));
+  return request<{ slots: AppointmentSlot[] }>(
+    `/availability?${params}`,
     { signal },
   );
+};
 
 export const fetchAppointments = () =>
   request<{ appointments: Appointment[] }>("/");
 
 export const createAppointment = (booking: {
   departmentId: string;
-  service: string;
+  services: string[];
   date: string;
   startsAt: string;
   notes: string;

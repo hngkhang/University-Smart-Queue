@@ -256,8 +256,14 @@ export default function AppointmentsPage() {
                       {item.departmentName}
                     </p>
                     <h2 className="mt-2 text-lg font-bold text-slate-900">
-                      {item.service}
+                      {item.services.length === 1 ? item.services[0].name : `${item.services.length} services in one visit`}
                     </h2>
+                    <ul className="mt-2 space-y-1 text-sm text-slate-600">
+                      {item.services.map((service) => (
+                        <li key={service.name}>{service.name} · {service.estimatedDuration} min</li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-sm font-medium text-slate-700">Total: {item.estimatedServiceTime} minutes</p>
                   </div>
                   <span
                     className={`h-fit w-fit rounded-full px-3 py-1 text-xs font-semibold ${status === "Confirmed" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}

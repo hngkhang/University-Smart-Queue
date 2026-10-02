@@ -6,6 +6,7 @@ const authRoutes = require("./routes/authRoutes");
 const departmentRoutes = require("./routes/departmentRoutes");
 const queueRoutes = require("./routes/queueRoutes");
 const QueueTicket = require("./models/QueueTicket");
+const Appointment = require("./models/Appointment");
 
 dotenv.config({ quiet: true });
 
@@ -58,6 +59,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/departments", departmentRoutes);
 app.use("/api/queue", queueRoutes);
+app.use("/api/appointments", require("./routes/appointmentRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
 app.use((error, _req, res, _next) => {
   console.error("API error:", error.message);
@@ -69,7 +71,7 @@ mongoose
     serverSelectionTimeoutMS: 5000,
   })
   .then(async () => {
-    await QueueTicket.init();
+    await Promise.all([QueueTicket.init(), Appointment.init()]);
     console.log("Connected to MongoDB");
     app.listen(port, () => {
       console.log(`Server is running on port ${port}`);
