@@ -37,6 +37,19 @@ const ticketSchema = new mongoose.Schema(
       default: "waiting",
     },
     cancelledAt: { type: Date, default: null },
+    calledAt: { type: Date, default: null },
+    lastCalledAt: { type: Date, default: null },
+    startedAt: { type: Date, default: null },
+    completedAt: { type: Date, default: null },
+    noShowAt: { type: Date, default: null },
+    assignedStaff: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    assignedStaffName: { type: String, default: "" },
+    statusHistory: [{
+      _id: false,
+      status: { type: String, enum: ["waiting", "called", "serving", "completed", "cancelled", "no_show"], required: true },
+      at: { type: Date, required: true },
+      actor: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    }],
   },
   { collection: "queue_tickets", timestamps: true },
 );
@@ -57,5 +70,14 @@ ticketSchema.index(
   { unique: true },
 );
 ticketSchema.index({ department: 1, status: 1, createdAt: 1 });
+// A staff member can claim only one visit, even from concurrent browser tabs.
+ticketSchema.index({ assignedStaff: 1 }, {
+  unique: true,
+  partialFilterExpression: {
+    assignedStaff: { $type: "objectId" },
+    status: { $in: ["called", "serving"] },
+  },
+  name: "one_current_ticket_per_staff",
+});
 
 module.exports = mongoose.model("QueueTicket", ticketSchema);

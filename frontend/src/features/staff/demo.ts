@@ -1,11 +1,11 @@
 export type VisitStatus =
-  "waiting" | "called" | "serving" | "completed" | "no_show";
+  "waiting" | "called" | "serving" | "completed" | "no_show" | "cancelled";
 export interface StaffVisit {
   id: string;
   reference: string;
   name: string;
   studentId: string;
-  services: { name: string; duration: number }[];
+  services: { name: string; duration: number | null }[];
   notes: string;
   joinedAt: number;
   status: VisitStatus;

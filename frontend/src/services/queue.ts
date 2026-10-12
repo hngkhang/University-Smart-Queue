@@ -1,6 +1,11 @@
 import type { QueueTicket } from "../types";
 import { readSession } from "./session";
 
+export const ticketStatusLabels: Record<QueueTicket["status"], string> = {
+  waiting: "Waiting", called: "Called", serving: "Being served",
+  completed: "Completed", cancelled: "Cancelled", no_show: "No-show",
+};
+
 const API_BASE_URL =
   import.meta.env.VITE_API_URL ?? "http://127.0.0.1:5000/api";
 

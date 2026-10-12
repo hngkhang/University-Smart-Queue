@@ -53,4 +53,12 @@ export interface QueueTicket {
   peopleAhead: number | null;
   location: string;
   createdAt: string;
+  calledAt?: string | null;
+  lastCalledAt?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  cancelledAt?: string | null;
+  noShowAt?: string | null;
+  assignedStaffName?: string;
+  statusHistory?: { status: QueueTicket["status"]; at: string }[];
 }

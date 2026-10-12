@@ -721,7 +721,8 @@
   color: #288366;
   background: #eaf7f0;
 }
-.sw-badge.no_show {
+  .sw-badge.no_show,
+  .sw-badge.cancelled {
   color: #a35560;
   background: #fff0f2;
 }

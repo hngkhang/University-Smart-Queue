@@ -23,7 +23,7 @@ async function ticketResponse(ticket) {
   const [department, queue, peopleAhead] = await Promise.all([
     Department.findById(ticket.department).lean(),
     Queue.findOne({ department: ticket.department }).lean(),
-    active
+    ticket.status === "waiting"
       ? QueueTicket.countDocuments({
           department: ticket.department,
           status: { $in: activeStatuses },
@@ -32,7 +32,7 @@ async function ticketResponse(ticket) {
             { serviceDate: ticket.serviceDate, number: { $lt: ticket.number } },
           ],
         })
-      : Promise.resolve(null),
+      : Promise.resolve(active ? 0 : null),
   ]);
   return {
     ...ticket,
@@ -45,7 +45,7 @@ async function ticketResponse(ticket) {
           ? "paused"
           : "open",
     peopleAhead,
-    // Counter availability and service progress are not yet tracked.
+    // Wait estimates need counter availability and measured service durations.
     estimatedWait: null,
   };
 }
@@ -59,7 +59,7 @@ router.get("/mine", async (req, res) => {
       student: req.student._id,
       status: { $nin: activeStatuses },
     })
-      .sort({ createdAt: -1 })
+      .sort({ updatedAt: -1 })
       .limit(20)
       .lean(),
   ]);
@@ -146,6 +146,7 @@ router.post("/", async (req, res) => {
       number: sequence.value,
       services: snapshots,
       notes: notes.trim(),
+      statusHistory: [{ status: "waiting", at: new Date(), actor: req.student._id }],
       estimatedServiceTime: snapshots.every(
         (service) => service.estimatedDuration !== null,
       )
@@ -178,7 +179,10 @@ router.patch("/:id/cancel", async (req, res) => {
       student: req.student._id,
       status: "waiting",
     },
-    { $set: { status: "cancelled", cancelledAt: new Date() } },
+    {
+      $set: { status: "cancelled", cancelledAt: new Date() },
+      $push: { statusHistory: { status: "cancelled", at: new Date(), actor: req.student._id } },
+    },
     { returnDocument: "after" },
   ).lean();
   if (!ticket)

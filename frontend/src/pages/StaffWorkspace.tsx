@@ -27,7 +27,6 @@ import {
   UserRound,
   Users,
   Volume2,
-  WifiOff,
   X,
 } from "lucide-react";
 import logo from "../assets/hcmute-logo.png";
@@ -41,6 +40,9 @@ import { fetchDepartment } from "../services/departments";
 import type { Department } from "../types";
 import { createDemo, demoReducer } from "../features/staff/demo";
 import type { StaffVisit } from "../features/staff/demo";
+import { useStaffQueue } from "../features/staff/useStaffQueue";
+import type { StaffAction } from "../services/staff";
+import { durationLabel } from "../services/queue";
 import "../styles/staff.css";
 
 const statusNames = {
@@ -49,6 +51,7 @@ const statusNames = {
   serving: "In service",
   completed: "Completed",
   no_show: "No-show",
+  cancelled: "Cancelled",
 };
 const clockTime = (value: number) =>
   new Intl.DateTimeFormat("en-GB", {
@@ -188,6 +191,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
   const base = preview ? "/staff/preview" : "/staff";
   const historyPage = pathname.endsWith("/history");
   const [demo, setDemo] = useState(preview);
+  const live = useStaffQueue(!demo && !!user.department);
   const [state, dispatch] = useReducer(demoReducer, undefined, () =>
     createDemo(Date.now()),
   );
@@ -202,6 +206,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
   const [historyFilter, setHistoryFilter] = useState("all");
   const [inspected, setInspected] = useState<StaffVisit | null>(null);
   const [confirmNoShow, setConfirmNoShow] = useState<string | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState<StaffVisit | null>(null);
   const [checked, setChecked] = useState<string[]>([]);
   const [checklistTicket, setChecklistTicket] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -239,10 +244,20 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
     ? "Academic Affairs Office"
     : office.data?.name ||
       (office.loading ? "Loading your office…" : "Your service office");
-  const current = demo ? state.current : null;
-  const waiting = demo ? state.waiting : [];
-  const history = demo ? state.history : [];
-  const paused = demo && state.paused;
+  const current = demo ? state.current : live.data?.current;
+  const waiting = demo ? state.waiting : live.data?.waiting || [];
+  const history = demo ? state.history : live.data?.history || [];
+  const paused = demo ? state.paused : !!live.data?.paused;
+  const ready = demo || !!live.data;
+  const actionsDisabled = !demo && (live.busy || !live.data || !!live.error);
+  const callsClosed = !demo && !live.data?.isOpen;
+  function act(action: StaffAction) {
+    if (demo) {
+      if (action !== "cancel") dispatch(action === "pause" ? { type: "pause" } : { type: action, now: Date.now() });
+    } else {
+      void live.act(action, current?.id);
+    }
+  }
   const matches = (visit: StaffVisit) =>
     `${visit.reference} ${visit.name} ${visit.studentId} ${visit.services.map((service) => service.name).join(" ")}`
       .toLowerCase()
@@ -386,10 +401,9 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
                 </>
               ) : (
                 <>
-                  <strong>Workspace setup</strong>
+                  <strong>Live service</strong>
                   <span>
-                    Live staff service is not connected yet. Explore the
-                    workflow with sample visits.
+                    Actions update student tickets. The queue refreshes every 5 seconds.
                   </span>
                 </>
               )}
@@ -413,7 +427,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
                   )}
                 </>
               ) : (
-                <button onClick={startDemo}>
+                <button onClick={startDemo} disabled={live.busy}>
                   Explore demo
                   <ArrowRight size={15} />
                 </button>
@@ -469,22 +483,22 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
             </div>
             <div className="sw-desk-state">
               <span
-                className={`sw-state-dot ${demo && !paused ? "available" : ""}`}
+                className={`sw-state-dot ${ready && !paused && !callsClosed ? "available" : ""}`}
               />
               <span>
-                {demo
-                  ? paused
+                {ready
+                  ? callsClosed ? "Office closed" : paused
                     ? "New calls paused"
                     : "Accepting next calls"
-                  : "Live service unavailable"}
+                  : "Loading live service…"}
               </span>
               <button
                 className="sw-button subtle"
-                disabled={!demo}
-                onClick={() => dispatch({ type: "pause" })}
+                disabled={actionsDisabled}
+                onClick={() => act("pause")}
               >
                 {paused ? <Play size={15} /> : <Pause size={15} />}
-                {paused ? "Resume" : "Pause calls"}
+                {paused ? "Resume office calls" : "Pause office calls"}
               </button>
             </div>
           </section>
@@ -512,6 +526,13 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
               )}
             </div>
           )}
+          {!demo && user.department && (
+            <div className="sw-office-feedback" role={live.error ? "alert" : "status"}>
+              {live.error || (!live.data ? "Loading live queue…" : live.busy ? "Saving your action…" : "Live queue connected.")}
+              {live.error && live.data && " Displayed information may be out of date."}{" "}
+              <button disabled={live.busy} onClick={live.refresh}>Refresh queue</button>
+            </div>
+          )}
           <section className="sw-stats" aria-label="Today at a glance">
             <div>
               <span className="sw-stat-icon blue">
@@ -520,7 +541,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
               <div>
                 <span>Waiting in office</span>
                 <strong>
-                  {demo ? waiting.length.toString().padStart(2, "0") : "—"}
+                  {ready ? waiting.length.toString().padStart(2, "0") : "—"}
                 </strong>
                 <small>Shared office queue</small>
               </div>
@@ -531,11 +552,11 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
               </span>
               <div>
                 <span>Your current visit</span>
-                <strong>{current?.reference || (demo ? "Ready" : "—")}</strong>
+                <strong>{current?.reference || (ready ? "Ready" : "—")}</strong>
                 <small>
                   {current
                     ? statusNames[current.status]
-                    : demo
+                    : ready
                       ? "No visit assigned"
                       : "Awaiting live connection"}
                 </small>
@@ -548,17 +569,17 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
               <div>
                 <span>Completed by you</span>
                 <strong>
-                  {demo ? completed.toString().padStart(2, "0") : "—"}
+                  {demo ? completed.toString().padStart(2, "0") : live.data?.completedToday ?? "—"}
                 </strong>
                 <small>{demo ? "Today · Demo session" : "Today"}</small>
               </div>
             </div>
           </section>
           <div className="sw-announcement" role="status" aria-live="polite">
-            {demo && state.notice && (
+            {(demo ? state.notice : live.notice) && (
               <>
                 <CheckCircle2 size={17} />
-                <span>{state.notice}</span>
+                <span>{demo ? state.notice : live.notice}</span>
               </>
             )}
           </div>
@@ -566,11 +587,11 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
             <section className="sw-panel sw-history">
               <div className="sw-panel-header">
                 <div>
-                  <h2>Your recent visits</h2>
-                  <p>Completed visits and students who missed their turn.</p>
+                  <h2>Recent office visits</h2>
+                  <p>Last 50 completed, cancelled and missed visits in your office.</p>
                 </div>
                 <span className="sw-count">
-                  {demo ? history.length : "—"} visits
+                  {ready ? history.length : "—"} visits
                 </span>
               </div>
               <div className="sw-history-tools">
@@ -592,12 +613,11 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
                     <option value="all">All statuses</option>
                     <option value="completed">Completed</option>
                     <option value="no_show">No-show</option>
+                    <option value="cancelled">Cancelled</option>
                   </select>
                 </label>
               </div>
-              {!demo ? (
-                <Unavailable onDemo={startDemo} />
-              ) : visibleHistory.length ? (
+              {visibleHistory.length ? (
                 <div className="sw-table-scroll">
                   <table>
                     <thead>
@@ -658,7 +678,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
                     <div className="sw-section-title">
                       <h2>Office queue</h2>
                       <span className="sw-count">
-                        {demo ? waiting.length : "—"}
+                        {ready ? waiting.length : "—"}
                       </span>
                     </div>
                     <p>Next in line, across all services.</p>
@@ -681,12 +701,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
                   <span>WAITING</span>
                 </div>
                 <div className="sw-queue-list">
-                  {!demo ? (
-                    <Empty
-                      title="Your queue will appear here"
-                      text="Live visits become available when staff service is connected."
-                    />
-                  ) : visibleWaiting.length ? (
+                  {visibleWaiting.length ? (
                     visibleWaiting.map((visit) => (
                       <button
                         key={visit.id}
@@ -729,7 +744,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
                       text={
                         waiting.length
                           ? "Try a ticket number, student name or service."
-                          : "There are no students waiting in this demo."
+                          : "There are no students waiting."
                       }
                     />
                   )}
@@ -751,14 +766,12 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
                   <span className={`sw-badge ${current?.status || ""}`}>
                     {current
                       ? statusNames[current.status]
-                      : demo
+                      : ready
                         ? "Ready for next"
                         : "Not connected"}
                   </span>
                 </div>
-                {!demo ? (
-                  <Unavailable onDemo={startDemo} />
-                ) : current ? (
+                {current ? (
                   <>
                     <div className="sw-current-heading">
                       <div>
@@ -829,12 +842,9 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
                         <span>({current.services.length})</span>
                       </h3>
                       <span>
-                        ~
-                        {current.services.reduce(
-                          (sum, service) => sum + service.duration,
-                          0,
-                        )}{" "}
-                        min total
+                        {durationLabel(current.services.every((service) => service.duration != null)
+                          ? current.services.reduce((sum, service) => sum + (service.duration ?? 0), 0)
+                          : null)} total
                       </span>
                     </div>
                     <div className="sw-service-list">
@@ -861,7 +871,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
                             }}
                           />
                           <span>{service.name}</span>
-                          <small>~{service.duration} min</small>
+                          <small>{durationLabel(service.duration)}</small>
                         </label>
                       ))}
                     </div>
@@ -884,8 +894,9 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
                         <>
                           <button
                             className="sw-button primary"
+                            disabled={actionsDisabled}
                             onClick={() =>
-                              dispatch({ type: "start", now: Date.now() })
+                              act("start")
                             }
                           >
                             <Play size={17} />
@@ -895,8 +906,9 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
                           <div>
                             <button
                               className="sw-button secondary"
+                              disabled={actionsDisabled}
                               onClick={() =>
-                                dispatch({ type: "recall", now: Date.now() })
+                                act("recall")
                               }
                             >
                               <Volume2 size={16} />
@@ -904,6 +916,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
                             </button>
                             <button
                               className="sw-button danger-quiet"
+                              disabled={actionsDisabled}
                               onClick={() => setConfirmNoShow(current.id)}
                             >
                               Mark no-show
@@ -913,8 +926,9 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
                       ) : (
                         <button
                           className="sw-button primary"
+                          disabled={actionsDisabled}
                           onClick={() =>
-                            dispatch({ type: "complete", now: Date.now() })
+                            act("complete")
                           }
                         >
                           <CheckCheck size={18} />
@@ -922,6 +936,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
                           <ArrowRight size={17} />
                         </button>
                       )}
+                      {!demo && <button className="sw-button danger-quiet" disabled={actionsDisabled} onClick={() => setConfirmCancel(current)}>Cancel ticket</button>}
                     </div>
                   </>
                 ) : (
@@ -941,13 +956,13 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
                         ? "Resume new calls when you are ready. Your office queue stays in order."
                         : waiting.length
                           ? `${waiting[0].reference} is next in your office queue.`
-                          : "You have reached the end of the demo queue. Reset the demo to explore again."}
+                          : demo ? "You have reached the end of the demo queue. Reset the demo to explore again." : "New students will appear here when they join your office queue."}
                     </p>
                     <button
                       className="sw-button primary"
-                      disabled={paused || !waiting.length}
+                      disabled={actionsDisabled || callsClosed || paused || !waiting.length}
                       onClick={() =>
-                        dispatch({ type: "call", now: Date.now() })
+                        act("call")
                       }
                     >
                       <Volume2 size={18} />
@@ -957,7 +972,8 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
                     {paused && (
                       <button
                         className="sw-button secondary"
-                        onClick={() => dispatch({ type: "pause" })}
+                        disabled={actionsDisabled}
+                        onClick={() => act("pause")}
                       >
                         <Play size={16} />
                         Resume calls
@@ -973,7 +989,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
               <span className="sw-state-dot" />
               {demo
                 ? "Demo session · Changes reset on reload"
-                : "Live service not connected"}
+                : "Live service · Updates every 5 seconds"}
             </span>
             <span>Small moments. Better campus days.</span>
           </footer>
@@ -995,7 +1011,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
               {inspected.services.map((service) => (
                 <li key={service.name}>
                   {service.name}
-                  <span>~{service.duration} min</span>
+                  <span>{durationLabel(service.duration)}</span>
                 </li>
               ))}
             </ul>
@@ -1004,7 +1020,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
             <p className="sw-dialog-hint">
               {inspected.status === "waiting"
                 ? "Use Call next at the service desk to take the next student in order."
-                : "This visit is part of your demo session."}
+                : demo ? "This visit is part of your demo session." : "This visit is saved in your office history."}
             </p>
             <button
               className="sw-button secondary"
@@ -1012,6 +1028,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
             >
               Close details
             </button>
+            {!demo && inspected.status === "waiting" && <button className="sw-button danger-quiet" disabled={actionsDisabled} onClick={() => { setConfirmCancel(inspected); setInspected(null); }}>Cancel ticket</button>}
           </div>
         </Dialog>
       )}
@@ -1034,14 +1051,26 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
               </button>
               <button
                 className="sw-button destructive"
+                disabled={actionsDisabled}
                 onClick={() => {
                   if (current?.id === confirmNoShow)
-                    dispatch({ type: "no_show", now: Date.now() });
+                    act("no_show");
                   setConfirmNoShow(null);
                 }}
               >
                 Mark no-show
               </button>
+            </div>
+          </div>
+        </Dialog>
+      )}
+      {confirmCancel && (
+        <Dialog title={`Cancel ${confirmCancel.reference}?`} onClose={() => setConfirmCancel(null)}>
+          <div className="sw-dialog-body">
+            <p>This ticket will leave the queue and be saved as cancelled in the student's history.</p>
+            <div className="sw-dialog-actions">
+              <button className="sw-button secondary" onClick={() => setConfirmCancel(null)}>Keep ticket</button>
+              <button className="sw-button destructive" disabled={actionsDisabled} onClick={() => { void live.act("cancel", confirmCancel.id); setConfirmCancel(null); }}>Cancel ticket</button>
             </div>
           </div>
         </Dialog>
@@ -1056,24 +1085,6 @@ function Empty({ title, text }: { title: string; text: string }) {
       <Users size={27} />
       <h3>{title}</h3>
       <p>{text}</p>
-    </div>
-  );
-}
-function Unavailable({ onDemo }: { onDemo: () => void }) {
-  return (
-    <div className="sw-ready">
-      <span className="sw-ready-icon">
-        <WifiOff size={30} />
-      </span>
-      <h3>Your desk is taking shape.</h3>
-      <p>
-        Live calling and service updates are not available yet. Try the demo to
-        explore your new workspace.
-      </p>
-      <button className="sw-button primary" onClick={onDemo}>
-        Explore demo
-        <ArrowRight size={17} />
-      </button>
     </div>
   );
 }
