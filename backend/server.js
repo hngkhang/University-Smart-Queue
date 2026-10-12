@@ -2,13 +2,14 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const mongoose = require("mongoose");
+const path = require("node:path");
 const authRoutes = require("./routes/authRoutes");
 const departmentRoutes = require("./routes/departmentRoutes");
 const queueRoutes = require("./routes/queueRoutes");
 const QueueTicket = require("./models/QueueTicket");
 const Appointment = require("./models/Appointment");
 
-dotenv.config({ quiet: true });
+dotenv.config({ path: path.join(__dirname, ".env"), quiet: true });
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -79,5 +80,10 @@ mongoose
     });
   })
   .catch((error) => {
-    console.error("MongoDB connection error:", error.message);
+    console.error("API could not start:", error.message);
+    console.error(
+      "Check MONGODB_URI in backend/.env and make sure MongoDB is reachable. " +
+        "The login page cannot connect until the API starts successfully.",
+    );
+    process.exitCode = 1;
   });

@@ -8,6 +8,7 @@ require("dotenv").config({ quiet: true });
 const Department = require("../models/Department");
 const User = require("../models/User");
 const Appointment = require("../models/Appointment");
+const { migrateAppointmentIndexes } = require("../lib/appointmentIndexes");
 const databaseName = `smartqueue_test_${randomUUID().replaceAll("-", "").slice(0, 16)}`;
 process.env.JWT_SECRET = randomUUID();
 let server, base, department, otherDepartment, date;
@@ -153,4 +154,81 @@ test("rechecks department booking rules and services on submission", async () =>
   await Department.updateOne({ _id: department._id }, { "services.0.estimatedDuration": 0 });
   assert.equal((await request("/appointments", token, "POST", booking())).status, 400);
   await Department.updateOne({ _id: department._id }, { "services.0.estimatedDuration": 10 });
+});
+
+const legacyIndexes = [
+  [{ reference: 1 }, { name: "reference_1", unique: true }],
+  [{ department: 1, occupiedMinutes: 1 }, { name: "department_1_occupiedMinutes_1", unique: true, partialFilterExpression: { status: "confirmed" } }],
+  [{ student: 1, occupiedMinutes: 1 }, { name: "student_1_occupiedMinutes_1", unique: true, partialFilterExpression: { status: "confirmed" } }],
+];
+
+test("legacy constraints do not report false overlap; migration preserves data and fixes booking", async (t) => {
+  const owner = await student();
+  const other = await student();
+  const first = await request("/appointments", owner.token, "POST", booking());
+  assert.equal(first.status, 201);
+  const collection = mongoose.connection.db.collection("appointments");
+  const logs = t.mock.method(console, "error", () => {});
+  try {
+    // Each obsolete constraint can reject a genuinely available interval.
+    for (const [key, options] of legacyIndexes) {
+      await collection.createIndex(key, options);
+      const slots = await request(availability(booking("08:00")), owner.token);
+      assert.equal(slots.data.slots.find((slot) => Date.parse(slot.startsAt) === Date.parse(booking("08:00").startsAt)).available, true);
+      const rejected = await request("/appointments", owner.token, "POST", booking("08:00"));
+      assert.equal(rejected.status, 500);
+      assert.match(rejected.data.message, /temporarily unavailable/);
+      assert.doesNotMatch(rejected.data.message, /overlaps/);
+      await collection.dropIndex(options.name);
+    }
+    assert.equal(logs.mock.callCount(), 3);
+    assert.equal(logs.mock.calls[0].arguments[1].code, 11000);
+    for (const [key, options] of legacyIndexes) await collection.createIndex(key, options);
+    const before = await collection.find({}).toArray();
+    const dryRun = await migrateAppointmentIndexes(collection);
+    assert.equal(dryRun.applied, false);
+    assert.equal(dryRun.toDrop.length, 3);
+    assert.ok((await collection.indexes()).some((index) => index.name === "reference_1"));
+    const applied = await migrateAppointmentIndexes(collection, { apply: true });
+    assert.equal(applied.toDrop.length, 3);
+    assert.deepEqual(await collection.find({}).toArray(), before);
+    assert.deepEqual((await migrateAppointmentIndexes(collection, { apply: true })).toDrop, []);
+    assert.equal((await request("/appointments", owner.token, "POST", booking("08:00"))).status, 201);
+    assert.equal((await request("/appointments", other.token, "POST", booking("08:00"))).status, 409);
+    assert.equal((await request("/appointments", owner.token, "POST", booking("08:00", otherDepartment._id))).status, 409);
+    assert.equal((await request(`/appointments/${first.data.appointment._id}/cancel`, owner.token, "PATCH")).status, 200);
+    assert.equal((await request("/appointments", other.token, "POST", booking())).status, 201);
+  } finally {
+    const indexes = await collection.indexes();
+    for (const [, options] of legacyIndexes) {
+      if (indexes.some((index) => index.name === options.name)) await collection.dropIndex(options.name);
+    }
+  }
+});
+
+test("migration refuses invalid reservation data without removing legacy indexes", async () => {
+  const { token } = await student();
+  assert.equal((await request("/appointments", token, "POST", booking())).status, 201);
+  const collection = mongoose.connection.db.collection("appointments");
+  await collection.createIndex(...legacyIndexes[0]);
+  try {
+    await collection.updateOne({}, { $set: { reservedMinutes: [1] } });
+    await assert.rejects(migrateAppointmentIndexes(collection, { apply: true }), /invalid reservation data/);
+    assert.ok((await collection.indexes()).some((index) => index.name === "reference_1"));
+  } finally { await collection.dropIndex("reference_1"); }
+});
+
+test("migration requires replacement indexes before dropping any legacy index", async () => {
+  const collection = mongoose.connection.db.collection("appointments");
+  await collection.createIndex(...legacyIndexes[0]);
+  await collection.dropIndex("appointment_department_minutes");
+  try {
+    await assert.rejects(migrateAppointmentIndexes(collection, { apply: true }), /Missing or unexpected/);
+    assert.ok((await collection.indexes()).some((index) => index.name === "reference_1"));
+  } finally {
+    await collection.createIndex({ department: 1, reservedMinutes: 1 }, {
+      name: "appointment_department_minutes", unique: true, partialFilterExpression: { status: "confirmed" },
+    });
+    await collection.dropIndex("reference_1");
+  }
 });

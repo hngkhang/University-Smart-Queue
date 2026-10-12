@@ -5,6 +5,7 @@ const Department = require("../models/Department");
 const studentAuth = require("../middleware/studentAuth");
 const officeLocation = require("../lib/officeLocation");
 const { validBookingDate, slotsFor, reservedMinutes } = require("../lib/appointmentSchedule");
+const { isAppointmentOverlap } = require("../lib/appointmentIndexes");
 
 const router = express.Router();
 router.use(studentAuth);
@@ -93,7 +94,7 @@ router.post("/", async (req, res) => {
     });
     return res.status(201).json({ appointment: response(appointment.toObject()) });
   } catch (error) {
-    if (error.code === 11000) return res.status(409).json({
+    if (isAppointmentOverlap(error)) return res.status(409).json({
       message: "This time overlaps an existing appointment. Please choose another time.",
     });
     throw error;
@@ -110,8 +111,8 @@ router.patch("/:id/cancel", async (req, res) => {
 });
 
 router.use((error, _req, res, _next) => {
-  console.error("Appointment request failed:", error.message);
-  res.status(500).json({ message: "Unable to update your appointment. Check My Appointments before trying again." });
+  console.error("Appointment request failed:", { code: error.code, keyPattern: error.keyPattern, message: error.message });
+  res.status(500).json({ message: "Appointment service is temporarily unavailable. Check My Appointments before trying again. If this continues, contact support." });
 });
 
 module.exports = router;
