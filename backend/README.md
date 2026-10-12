@@ -117,9 +117,20 @@ single insert, preventing concurrent overlapping appointments for a department
 or student (including across departments). Adjacent visits are allowed.
 Cancellation removes the confirmed reservation from those indexes atomically.
 
-Booking is separate from live queue admission and does not create a queue ticket.
-Appointment check-in, staff handling of appointments, and shared capacity between
-walk-ins and appointments remain future work.
+Five minutes before an appointment starts, the backend creates one linked queue
+ticket for it. A 15-second server sweep performs admission even if nobody has
+the page open; staff and student queue reads also trigger a sweep after a restart.
+The ticket uses the same office sequence and staff actions as a walk-in. Staff
+see its appointment reference and scheduled time, and students see the queue
+number and live service status in My Queue and My Appointments. The unique
+`one_ticket_per_appointment` index prevents duplicate admission across API
+processes. Existing appointment reservations remain in force while staff serve
+the ticket. A student can cancel the appointment before its scheduled start
+while its linked ticket is waiting; staff can cancel a linked ticket at any
+stage, which also cancels the booking. If the student already has an active
+walk-in ticket, admission retries when that ticket leaves the active queue.
+Queue capacity is still separate from appointment slot capacity; the scheduled
+time reserves a booking interval, not a guaranteed moment when staff calls.
 
 ### Repair legacy appointment indexes
 

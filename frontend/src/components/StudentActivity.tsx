@@ -35,6 +35,7 @@ function ActivityDetails() {
                 .filter(
                   (item) =>
                     item.status === "confirmed" &&
+                    !["completed", "cancelled", "no_show"].includes(item.serviceStatus || "") &&
                     new Date(item.endsAt).getTime() > Date.now(),
                 )
                 .sort(

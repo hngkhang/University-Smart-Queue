@@ -30,6 +30,9 @@ export interface Appointment {
   endsAt: string;
   notes: string;
   status: "confirmed" | "cancelled";
+  serviceStatus?: QueueTicket["status"] | null;
+  queueReference?: string | null;
+  queueAdmissionBlocked?: boolean;
 }
 
 export interface AppointmentSlot {
@@ -44,6 +47,9 @@ export interface QueueTicket {
   department: string;
   departmentName: string;
   serviceDate: string;
+  appointment?: string | null;
+  appointmentReference?: string | null;
+  appointmentStartsAt?: string | null;
   services: { name: string; estimatedDuration: number | null }[];
   estimatedServiceTime: number | null;
   estimatedWait: number | null;

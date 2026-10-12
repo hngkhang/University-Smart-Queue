@@ -13,6 +13,8 @@ const ticketSchema = new mongoose.Schema(
       required: true,
     },
     departmentName: { type: String, required: true },
+    appointment: { type: mongoose.Schema.Types.ObjectId, ref: "Appointment", default: null },
+    appointmentStartsAt: { type: Date, default: null },
     serviceDate: { type: String, required: true },
     number: { type: Number, required: true },
     services: [
@@ -70,6 +72,11 @@ ticketSchema.index(
   { unique: true },
 );
 ticketSchema.index({ department: 1, status: 1, createdAt: 1 });
+ticketSchema.index({ appointment: 1 }, {
+  unique: true,
+  partialFilterExpression: { appointment: { $type: "objectId" } },
+  name: "one_ticket_per_appointment",
+});
 // A staff member can claim only one visit, even from concurrent browser tabs.
 ticketSchema.index({ assignedStaff: 1 }, {
   unique: true,

@@ -3,6 +3,8 @@ export type VisitStatus =
 export interface StaffVisit {
   id: string;
   reference: string;
+  appointmentReference?: string | null;
+  appointmentStartsAt?: number;
   name: string;
   studentId: string;
   services: { name: string; duration: number | null }[];

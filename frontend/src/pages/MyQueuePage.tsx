@@ -20,6 +20,7 @@ import { readSession, SESSION_CHANGED_EVENT } from "../services/session";
 import type { QueueTicket } from "../types";
 import TicketProgress from "../components/TicketProgress";
 import { ticketStatusLabels as labels } from "../services/queue";
+import { appointmentTime } from "../services/appointments";
 
 const dateLabel = (value: string) =>
   new Intl.DateTimeFormat("en-GB", {
@@ -236,6 +237,7 @@ export default function MyQueuePage() {
               <p className="mt-3 text-5xl font-extrabold tracking-tight text-[#0B1F3A]">
                 {ticket.reference}
               </p>
+              {ticket.appointmentReference && <p className="mt-2 text-xs font-semibold text-[#3F6392]">Appointment {ticket.appointmentReference} · {ticket.appointmentStartsAt && appointmentTime(ticket.appointmentStartsAt)}</p>}
               <span className="mt-5 rounded-full border border-blue-200 bg-white px-4 py-1.5 text-xs font-bold text-[#3F6392]">
                 {labels[ticket.status]}
               </span>
@@ -335,7 +337,7 @@ export default function MyQueuePage() {
               Updates automatically every 5 seconds. Please be at the
               department when your number is called.
             </p>
-            {ticket.status === "waiting" && !confirmCancel && (
+            {ticket.status === "waiting" && !ticket.appointmentReference && !confirmCancel && (
               <button
                 type="button"
                 onClick={() => setConfirmCancel(true)}
@@ -344,7 +346,8 @@ export default function MyQueuePage() {
                 Cancel ticket
               </button>
             )}
-            {ticket.status === "waiting" && confirmCancel && (
+            {ticket.status === "waiting" && ticket.appointmentReference && <Link to="/appointments" className="text-sm font-semibold text-[#3F6392]">Manage appointment</Link>}
+            {ticket.status === "waiting" && !ticket.appointmentReference && confirmCancel && (
               <div className="w-full rounded-xl border border-red-100 bg-red-50 p-4">
                 <p className="text-sm font-semibold text-red-800">
                   Cancel this ticket and leave the queue?

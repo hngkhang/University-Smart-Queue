@@ -6,6 +6,7 @@ const QueueTicket = require("../models/QueueTicket");
 const QueueSequence = require("../models/QueueSequence");
 const officeLocation = require("../lib/officeLocation");
 const studentAuth = require("../middleware/studentAuth");
+const { admitDueAppointments } = require("../lib/appointmentQueue");
 
 const router = express.Router();
 const activeStatuses = ["waiting", "called", "serving"];
@@ -37,6 +38,7 @@ async function ticketResponse(ticket) {
   return {
     ...ticket,
     reference: `Q-${String(ticket.number).padStart(3, "0")}`,
+    appointmentReference: ticket.appointment ? `APT-${ticket.appointment}` : null,
     location: officeLocation(department?.location),
     queueStatus:
       !department?.isActive || !queue?.isOpen
@@ -53,6 +55,7 @@ async function ticketResponse(ticket) {
 router.use(studentAuth);
 
 router.get("/mine", async (req, res) => {
+  await admitDueAppointments({ student: req.student._id });
   const [active, history] = await Promise.all([
     QueueTicket.findOne(activeFor(req.student._id)).lean(),
     QueueTicket.find({
@@ -70,6 +73,7 @@ router.get("/mine", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
+  await admitDueAppointments({ student: req.student._id });
   const { departmentId, services, notes = "" } = req.body || {};
   if (
     !mongoose.isObjectIdOrHexString(departmentId) ||
@@ -173,6 +177,8 @@ router.patch("/:id/cancel", async (req, res) => {
   if (!mongoose.isObjectIdOrHexString(req.params.id)) {
     return res.status(400).json({ message: "Invalid ticket." });
   }
+  const booked = await QueueTicket.findOne({ _id: req.params.id, student: req.student._id, appointment: { $type: "objectId" } }).lean();
+  if (booked) return res.status(409).json({ message: "Cancel this visit from My Appointments before its scheduled time." });
   const ticket = await QueueTicket.findOneAndUpdate(
     {
       _id: req.params.id,

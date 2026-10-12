@@ -36,7 +36,11 @@ export default function AppointmentsPage() {
   }, []);
   useEffect(() => {
     let active = true;
-    fetchAppointments()
+    let pending = false;
+    const load = () => {
+      if (pending) return;
+      pending = true;
+      fetchAppointments()
       .then((data) => {
         if (active) {
           setAppointments(data.appointments);
@@ -57,22 +61,30 @@ export default function AppointmentsPage() {
         }
       })
       .finally(() => {
+        pending = false;
         if (active) setLoading(false);
       });
+    };
+    load();
+    const timer = window.setInterval(() => { if (!document.hidden) load(); }, 5000);
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
     return () => {
       active = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
     };
   }, [retry]);
 
   const upcoming = appointments
     .filter(
       (item) =>
-        item.status === "confirmed" && new Date(item.endsAt).getTime() > now,
+        item.status === "confirmed" && !["completed", "cancelled", "no_show"].includes(item.serviceStatus || "") && new Date(item.endsAt).getTime() > now,
     )
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   const history = appointments.filter(
     (item) =>
-      item.status === "cancelled" || new Date(item.endsAt).getTime() <= now,
+      item.status === "cancelled" || ["completed", "cancelled", "no_show"].includes(item.serviceStatus || "") || new Date(item.endsAt).getTime() <= now,
   );
   const visible = tab === "upcoming" ? upcoming : history;
 
@@ -237,14 +249,14 @@ export default function AppointmentsPage() {
           !loading &&
           visible.map((item) => {
             const future = new Date(item.startsAt).getTime() > now;
-            const status =
-              item.status === "cancelled"
-                ? "Cancelled"
-                : new Date(item.endsAt).getTime() <= now
-                  ? "Past"
-                  : future
-                    ? "Confirmed"
-                    : "Scheduled now";
+            const serviceLabels: Record<string, string> = {
+              no_show: "No-show", completed: "Completed", called: "Called",
+              serving: "In service", waiting: "In queue",
+            };
+            const status = item.status === "cancelled" ? "Cancelled"
+              : item.serviceStatus ? serviceLabels[item.serviceStatus] || "Past"
+                : new Date(item.endsAt).getTime() <= now ? "Past"
+                  : future ? "Confirmed" : "Scheduled now";
             return (
               <article
                 key={item._id}
@@ -281,11 +293,13 @@ export default function AppointmentsPage() {
                     {appointmentTime(item.startsAt)} –{" "}
                     {appointmentTime(item.endsAt)} (UTC+7)
                   </span>
+                  {item.queueReference && <Link to="/queue" className="font-semibold text-[#3F6392]">Queue ticket {item.queueReference}</Link>}
                   <span className="inline-flex items-center gap-2">
                     <MapPin size={16} className="text-slate-400" />
                     {item.location}
                   </span>
                 </div>
+                {item.queueAdmissionBlocked && <p role="status" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Your appointment is ready to enter the queue, but you have another active ticket. <Link to="/queue" className="font-semibold underline">View My Queue</Link> and finish or cancel that ticket first.</p>}
                 <div className="mt-5 flex flex-wrap justify-between gap-3 border-t border-slate-100 pt-4">
                   <button
                     type="button"
@@ -303,7 +317,7 @@ export default function AppointmentsPage() {
                       <ChevronDown size={16} />
                     )}
                   </button>
-                  {future && item.status === "confirmed" && (
+                  {future && item.status === "confirmed" && (!item.serviceStatus || item.serviceStatus === "waiting") && (
                     <button
                       type="button"
                       disabled={Boolean(cancelling)}

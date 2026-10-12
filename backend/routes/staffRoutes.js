@@ -4,6 +4,8 @@ const requireRole = require("../middleware/requireRole");
 const Department = require("../models/Department");
 const Queue = require("../models/Queue");
 const Ticket = require("../models/QueueTicket");
+const Appointment = require("../models/Appointment");
+const { admitDueAppointments } = require("../lib/appointmentQueue");
 
 const router = express.Router();
 const currentStatuses = ["called", "serving"];
@@ -20,6 +22,8 @@ const visitQuery = (query) => query.populate("student", "fullName studentID").le
 const visit = (ticket) => ({
   id: ticket._id,
   reference: `Q-${String(ticket.number).padStart(3, "0")}`,
+  appointmentReference: ticket.appointment ? `APT-${ticket.appointment}` : null,
+  appointmentStartsAt: ticket.appointmentStartsAt ? new Date(ticket.appointmentStartsAt).getTime() : undefined,
   name: ticket.student?.fullName || "Student unavailable",
   studentId: ticket.student?.studentID || "—",
   services: ticket.services.map((service) => ({ name: service.name, duration: service.estimatedDuration })),
@@ -33,6 +37,7 @@ const visit = (ticket) => ({
 
 router.get("/queue", async (req, res) => {
   const department = req.department._id;
+  await admitDueAppointments({ department });
   const vietnamDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const [current, waiting, history, queue, completedToday] = await Promise.all([
     visitQuery(Ticket.findOne({ department, assignedStaff: req.user._id, status: { $in: currentStatuses } })),
@@ -54,6 +59,7 @@ router.patch("/queue/pause", async (req, res) => {
 
 router.post("/queue/call", async (req, res) => {
   const department = req.department._id;
+  await admitDueAppointments({ department });
   const queue = await Queue.findOne({ department }).lean();
   if (!req.department.isActive || !queue?.isOpen || queue.isPaused)
     return res.status(409).json({ message: "New calls are unavailable while the office is closed or paused." });
@@ -96,6 +102,10 @@ router.patch("/tickets/:id/:action", async (req, res) => {
     ...(req.params.action === "recall" ? {} : { $push: { statusHistory: { status: transition.status, at: now, actor: req.user._id } } }),
   }, { returnDocument: "after" }).lean();
   if (!ticket) return res.status(409).json({ message: "This visit changed or belongs to another staff member. Refresh your queue." });
+  if (ticket.appointment && req.params.action === "cancel") {
+    await Appointment.updateOne({ _id: ticket.appointment, status: "confirmed" },
+      { $set: { status: "cancelled", cancelledAt: now } });
+  }
   res.json({ message: req.params.action === "recall" ? "Student called again." : "Visit status updated." });
 });
 

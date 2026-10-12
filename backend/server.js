@@ -8,6 +8,7 @@ const departmentRoutes = require("./routes/departmentRoutes");
 const queueRoutes = require("./routes/queueRoutes");
 const QueueTicket = require("./models/QueueTicket");
 const Appointment = require("./models/Appointment");
+const { admitDueAppointments } = require("./lib/appointmentQueue");
 
 dotenv.config({ path: path.join(__dirname, ".env"), quiet: true });
 
@@ -75,6 +76,9 @@ mongoose
   .then(async () => {
     await Promise.all([QueueTicket.init(), Appointment.init()]);
     console.log("Connected to MongoDB");
+    const admit = () => admitDueAppointments().catch((error) => console.error("Appointment queue admission failed:", error));
+    void admit();
+    setInterval(admit, 15000).unref();
     app.listen(port, () => {
       console.log(`Server is running on port ${port}`);
     });

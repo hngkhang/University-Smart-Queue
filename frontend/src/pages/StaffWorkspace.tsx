@@ -259,7 +259,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
     }
   }
   const matches = (visit: StaffVisit) =>
-    `${visit.reference} ${visit.name} ${visit.studentId} ${visit.services.map((service) => service.name).join(" ")}`
+    `${visit.reference} ${visit.appointmentReference || ""} ${visit.name} ${visit.studentId} ${visit.services.map((service) => service.name).join(" ")}`
       .toLowerCase()
       .includes(query.trim().toLowerCase());
   const visibleWaiting = waiting.filter(matches);
@@ -637,6 +637,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
                           <td>
                             <strong>{visit.reference}</strong>
                             <span>{visit.name}</span>
+                            {visit.appointmentStartsAt && <span>Appointment · {clockTime(visit.appointmentStartsAt)}</span>}
                           </td>
                           <td>
                             {visit.services
@@ -711,6 +712,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
                       >
                         <span className="sw-ticket-code">
                           {visit.reference}
+                          {visit.appointmentStartsAt && <small>APPOINTMENT · {clockTime(visit.appointmentStartsAt)}</small>}
                           {visit.id === waiting[0]?.id && <small>NEXT</small>}
                         </span>
                         <span className="sw-queue-person">
@@ -777,6 +779,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
                       <div>
                         <small>TICKET NUMBER</small>
                         <strong>{current.reference}</strong>
+                        {current.appointmentStartsAt && <small>Appointment · {clockTime(current.appointmentStartsAt)}</small>}
                       </div>
                       <div className="sw-call-time">
                         <Clock3 size={15} />
@@ -1006,6 +1009,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
             </span>
             <h3>{inspected.name}</h3>
             <p>Student ID · {inspected.studentId}</p>
+            {inspected.appointmentStartsAt && <p>Appointment {inspected.appointmentReference} · {clockTime(inspected.appointmentStartsAt)} (Vietnam time)</p>}
             <h4>Requested services</h4>
             <ul>
               {inspected.services.map((service) => (

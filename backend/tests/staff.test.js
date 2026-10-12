@@ -9,6 +9,9 @@ const Department = require("../models/Department");
 const Queue = require("../models/Queue");
 const User = require("../models/User");
 const Ticket = require("../models/QueueTicket");
+const Appointment = require("../models/Appointment");
+const { admitDueAppointments } = require("../lib/appointmentQueue");
+const { reservedMinutes } = require("../lib/appointmentSchedule");
 const databaseName = `smartqueue_test_${randomUUID().replaceAll("-", "").slice(0, 16)}`;
 process.env.JWT_SECRET = randomUUID();
 let server, base, office, otherOffice, staff, colleague, outsider;
@@ -32,17 +35,18 @@ const mine = (who) => request("/queue/mine", who.token);
 
 before(async () => {
   await mongoose.connect(process.env.TEST_MONGODB_URI || process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/smart_queue", { dbName: databaseName, serverSelectionTimeoutMS: 10000 });
-  await Promise.all([Ticket.init(), User.init()]);
+  await Promise.all([Ticket.init(), Appointment.init(), User.init()]);
   const app = express();
   app.use(express.json());
   app.use("/staff", require("../routes/staffRoutes"));
   app.use("/queue", require("../routes/queueRoutes"));
+  app.use("/appointments", require("../routes/appointmentRoutes"));
   server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
   base = `http://127.0.0.1:${server.address().port}`;
 });
 beforeEach(async () => {
-  await Promise.all([Ticket.deleteMany({}), User.deleteMany({}), Department.deleteMany({}), Queue.deleteMany({})]);
+  await Promise.all([Ticket.deleteMany({}), Appointment.deleteMany({}), User.deleteMany({}), Department.deleteMany({}), Queue.deleteMany({})]);
   [office, otherOffice] = await Department.create([{ name: "Registrar", services: [{ name: "Transcript", estimatedDuration: 10 }] }, { name: "Finance", services: [{ name: "Transcript", estimatedDuration: 10 }] }]);
   await Queue.create([{ department: office._id, isOpen: true }, { department: otherOffice._id, isOpen: true }]);
   [staff, colleague, outsider] = await Promise.all([account("staff", office._id), account("staff", office._id), account("staff", otherOffice._id)]);
@@ -182,4 +186,105 @@ test("rejects malformed and unknown actions without changing the ticket", async 
   assert.equal((await act(student.ticket._id, "constructor")).status, 400);
   assert.equal((await request("/staff/queue/pause", staff.token, "PATCH", { paused: "true" })).status, 400);
   assert.equal((await mine(student)).data.ticket.status, "waiting");
+});
+
+async function scheduledFor(student, department = office) {
+  const now = Date.now();
+  const startsAt = new Date(Math.ceil((now + 4 * 60000) / 60000) * 60000);
+  const endsAt = new Date(startsAt.getTime() + 20 * 60000);
+  return Appointment.create({
+    student: student.user._id, department: department._id, departmentName: department.name,
+    location: "Campus office", services: [{ name: "Transcript", estimatedDuration: 20 }],
+    estimatedServiceTime: 20, startsAt, endsAt, reservedMinutes: reservedMinutes(startsAt, endsAt),
+    notes: "Booked visit",
+  });
+}
+
+test("an appointment enters the office queue five minutes early exactly once and follows staff actions", async () => {
+  const owner = await account("student");
+  const appointment = await scheduledFor(owner);
+  const far = new Date(appointment.startsAt.getTime() - 5 * 60000 - 1000);
+  assert.equal(await admitDueAppointments({ now: far }), 0);
+  assert.equal(await Ticket.countDocuments({ appointment: appointment._id }), 0);
+  const results = await Promise.all(Array.from({ length: 5 }, () => admitDueAppointments({ now: new Date() })));
+  assert.equal(results.reduce((sum, count) => sum + count, 0), 1);
+  assert.equal(await Ticket.countDocuments({ appointment: appointment._id }), 1);
+  const waiting = (await request("/staff/queue", staff.token)).data.waiting;
+  assert.equal(waiting.length, 1);
+  assert.equal(waiting[0].appointmentReference, `APT-${appointment._id}`);
+  assert.equal(waiting[0].appointmentStartsAt, appointment.startsAt.getTime());
+  const mineBefore = (await request("/queue/mine", owner.token)).data.ticket;
+  assert.equal(mineBefore.appointmentReference, `APT-${appointment._id}`);
+  assert.equal((await request("/appointments", owner.token)).data.appointments[0].serviceStatus, "waiting");
+  assert.equal((await call()).status, 200);
+  assert.equal((await request("/appointments", owner.token)).data.appointments[0].serviceStatus, "called");
+  assert.equal((await act(mineBefore._id, "start")).status, 200);
+  assert.equal((await act(mineBefore._id, "complete")).status, 200);
+  assert.equal((await request("/appointments", owner.token)).data.appointments[0].serviceStatus, "completed");
+  assert.equal((await request("/queue/mine", owner.token)).data.history[0].appointmentReference, `APT-${appointment._id}`);
+  assert.equal(await admitDueAppointments({ now: new Date() }), 0);
+});
+
+test("student cancellation releases an admitted appointment and cannot affect another student", async () => {
+  const owner = await account("student"), stranger = await account("student");
+  const appointment = await scheduledFor(owner);
+  await admitDueAppointments();
+  assert.equal((await request(`/appointments/${appointment._id}/cancel`, stranger.token, "PATCH")).status, 409);
+  assert.equal((await Ticket.findOne({ appointment: appointment._id })).status, "waiting");
+  assert.equal((await request(`/appointments/${appointment._id}/cancel`, owner.token, "PATCH")).status, 200);
+  assert.equal((await Ticket.findOne({ appointment: appointment._id })).status, "cancelled");
+  assert.equal((await Appointment.findById(appointment._id)).status, "cancelled");
+  assert.equal((await request("/staff/queue", staff.token)).data.waiting.length, 0);
+  assert.equal(await admitDueAppointments(), 0);
+});
+
+test("a called appointment cannot be cancelled by the student; staff may finish or cancel it", async () => {
+  const owner = await account("student");
+  const appointment = await scheduledFor(owner);
+  await admitDueAppointments();
+  const id = (await Ticket.findOne({ appointment: appointment._id }))._id;
+  assert.equal((await request(`/queue/${id}/cancel`, owner.token, "PATCH")).status, 409);
+  await call();
+  assert.equal((await request(`/appointments/${appointment._id}/cancel`, owner.token, "PATCH")).status, 409);
+  assert.equal((await act(id, "cancel")).status, 200);
+  assert.equal((await Appointment.findById(appointment._id)).status, "cancelled");
+});
+
+test("staff can mark an appointment no-show and the student sees that result", async () => {
+  const owner = await account("student");
+  const appointment = await scheduledFor(owner);
+  await admitDueAppointments();
+  const ticket = await Ticket.findOne({ appointment: appointment._id });
+  assert.equal((await call()).status, 200);
+  assert.equal((await act(ticket._id, "no_show")).status, 200);
+  const mine = (await request("/appointments", owner.token)).data.appointments[0];
+  assert.equal(mine.serviceStatus, "no_show");
+  assert.equal(mine.queueReference, `Q-${String(ticket.number).padStart(3, "0")}`);
+  assert.equal((await request("/queue/mine", owner.token)).data.history[0].status, "no_show");
+});
+
+test("concurrent admission and cancellation cannot leave a cancelled appointment waiting", async () => {
+  const owner = await account("student");
+  const appointment = await scheduledFor(owner);
+  const [, cancellation] = await Promise.all([
+    admitDueAppointments(),
+    request(`/appointments/${appointment._id}/cancel`, owner.token, "PATCH"),
+  ]);
+  assert.equal(cancellation.status, 200);
+  await admitDueAppointments();
+  assert.equal((await Appointment.findById(appointment._id)).status, "cancelled");
+  assert.equal(await Ticket.countDocuments({ appointment: appointment._id, status: "waiting" }), 0);
+});
+
+test("an active walk-in ticket delays appointment admission until the ticket is released", async () => {
+  const owner = await account("student");
+  const walkIn = await request("/queue", owner.token, "POST", { departmentId: otherOffice.id, services: ["Transcript"] });
+  assert.equal(walkIn.status, 201);
+  const appointment = await scheduledFor(owner);
+  assert.equal(await admitDueAppointments(), 0);
+  assert.equal(await Ticket.countDocuments({ appointment: appointment._id }), 0);
+  assert.equal((await request("/appointments", owner.token)).data.appointments[0].queueAdmissionBlocked, true);
+  assert.equal((await request(`/queue/${walkIn.data.ticket._id}/cancel`, owner.token, "PATCH")).status, 200);
+  assert.equal(await admitDueAppointments(), 1);
+  assert.equal((await request("/queue/mine", owner.token)).data.ticket.appointmentReference, `APT-${appointment._id}`);
 });

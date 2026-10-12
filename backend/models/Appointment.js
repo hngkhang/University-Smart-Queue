@@ -30,5 +30,6 @@ for (const resource of ["department", "student"]) {
 }
 schema.index({ student: 1, startsAt: -1 });
 schema.index({ department: 1, status: 1, startsAt: 1 });
+schema.index({ status: 1, startsAt: 1 });
 
 module.exports = mongoose.model("Appointment", schema);
