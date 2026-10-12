@@ -59,6 +59,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/departments", departmentRoutes);
 app.use("/api/queue", queueRoutes);
+app.use("/api/staff", require("./routes/staffRoutes"));
 app.use("/api/appointments", require("./routes/appointmentRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
 app.use((error, _req, res, _next) => {
