@@ -6,6 +6,9 @@ const Queue = require("../models/Queue");
 const Ticket = require("../models/QueueTicket");
 const Appointment = require("../models/Appointment");
 const { admitDueAppointments } = require("../lib/appointmentQueue");
+const { dayEndsAt, cancelEndedTickets } = require("../lib/ticketExpiry");
+const { dateInVietnam } = require("../lib/appointmentSchedule");
+const dayHasEnded = (department) => new Date() >= dayEndsAt(dateInVietnam(), department.workingHours);
 
 const router = express.Router();
 const currentStatuses = ["called", "serving"];
@@ -15,6 +18,10 @@ router.use(async (req, res, next) => {
   if (!department || department.isArchived)
     return res.status(403).json({ message: "Your account has no available assigned office. Please contact your administrator." });
   req.department = department;
+  // Queue reads and calls run cleanup through appointment admission below.
+  if (req.path !== "/queue" && req.path !== "/queue/call") {
+    await cancelEndedTickets({ department: department._id });
+  }
   next();
 });
 
@@ -46,7 +53,7 @@ router.get("/queue", async (req, res) => {
     Queue.findOne({ department }).lean(),
     Ticket.countDocuments({ department, assignedStaff: req.user._id, status: "completed", completedAt: { $gte: new Date(`${vietnamDate}T00:00:00+07:00`) } }),
   ]);
-  res.json({ current: current ? visit(current) : null, waiting: waiting.map(visit), history: history.map(visit), paused: !!queue?.isPaused, isOpen: !!queue?.isOpen && req.department.isActive, completedToday });
+  res.json({ current: current ? visit(current) : null, waiting: waiting.map(visit), history: history.map(visit), paused: !!queue?.isPaused, isOpen: !!queue?.isOpen && req.department.isActive && !dayHasEnded(req.department), completedToday });
 });
 
 router.patch("/queue/pause", async (req, res) => {
@@ -61,7 +68,7 @@ router.post("/queue/call", async (req, res) => {
   const department = req.department._id;
   await admitDueAppointments({ department });
   const queue = await Queue.findOne({ department }).lean();
-  if (!req.department.isActive || !queue?.isOpen || queue.isPaused)
+  if (!req.department.isActive || !queue?.isOpen || queue.isPaused || dayHasEnded(req.department))
     return res.status(409).json({ message: "New calls are unavailable while the office is closed or paused." });
   if (await Ticket.exists({ assignedStaff: req.user._id, status: { $in: currentStatuses } }))
     return res.status(409).json({ message: "Finish your current visit before calling another student." });

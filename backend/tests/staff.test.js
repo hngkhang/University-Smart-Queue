@@ -47,7 +47,7 @@ before(async () => {
 });
 beforeEach(async () => {
   await Promise.all([Ticket.deleteMany({}), Appointment.deleteMany({}), User.deleteMany({}), Department.deleteMany({}), Queue.deleteMany({})]);
-  [office, otherOffice] = await Department.create([{ name: "Registrar", services: [{ name: "Transcript", estimatedDuration: 10 }] }, { name: "Finance", services: [{ name: "Transcript", estimatedDuration: 10 }] }]);
+  [office, otherOffice] = await Department.create([{ name: "Registrar", workingHours: "00:00 - 23:59", services: [{ name: "Transcript", estimatedDuration: 10 }] }, { name: "Finance", workingHours: "00:00 - 23:59", services: [{ name: "Transcript", estimatedDuration: 10 }] }]);
   await Queue.create([{ department: office._id, isOpen: true }, { department: otherOffice._id, isOpen: true }]);
   [staff, colleague, outsider] = await Promise.all([account("staff", office._id), account("staff", office._id), account("staff", otherOffice._id)]);
 });

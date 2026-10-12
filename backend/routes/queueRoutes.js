@@ -7,6 +7,7 @@ const QueueSequence = require("../models/QueueSequence");
 const officeLocation = require("../lib/officeLocation");
 const studentAuth = require("../middleware/studentAuth");
 const { admitDueAppointments } = require("../lib/appointmentQueue");
+const { dayEndsAt } = require("../lib/ticketExpiry");
 
 const router = express.Router();
 const activeStatuses = ["waiting", "called", "serving"];
@@ -41,7 +42,7 @@ async function ticketResponse(ticket) {
     appointmentReference: ticket.appointment ? `APT-${ticket.appointment}` : null,
     location: officeLocation(department?.location),
     queueStatus:
-      !department?.isActive || !queue?.isOpen
+      !department?.isActive || !queue?.isOpen || new Date() >= dayEndsAt(serviceDate(), department?.workingHours)
         ? "closed"
         : queue.isPaused
           ? "paused"
@@ -107,7 +108,7 @@ router.post("/", async (req, res) => {
   ]);
   if (!department)
     return res.status(404).json({ message: "Department not found." });
-  if (!department.isActive || !queue?.isOpen || queue.isPaused) {
+  if (!department.isActive || !queue?.isOpen || queue.isPaused || new Date() >= dayEndsAt(serviceDate(), department.workingHours)) {
     return res
       .status(409)
       .json({

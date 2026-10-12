@@ -6,12 +6,13 @@ const QueueTicket = require("../models/QueueTicket");
 
 const router = express.Router();
 
-const { DEFAULT_WORKING_HOURS } = require("../lib/appointmentSchedule");
+const { DEFAULT_WORKING_HOURS, dateInVietnam } = require("../lib/appointmentSchedule");
+const { dayEndsAt } = require("../lib/ticketExpiry");
 
 const formatLocation = require("../lib/officeLocation");
 
 const getStatus = (department, queue) => {
-  if (!department.isActive || !queue?.isOpen) {
+  if (!department.isActive || !queue?.isOpen || new Date() >= dayEndsAt(dateInVietnam(), department.workingHours)) {
     return "closed";
   }
 

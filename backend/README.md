@@ -57,8 +57,15 @@ Staff actions now move saved tickets through `waiting → called → serving →
 Students can cancel only waiting tickets. Staff can cancel a waiting ticket in
 their office or their own current visit; only a called visit can be marked
 `no_show`. Terminal tickets move to history and release the student's active
-ticket restriction. No-shows require an explicit staff action, and saved tickets
-do not automatically expire at midnight.
+ticket restriction. No-shows require an explicit staff action; My Appointments
+explains that the ticket is no longer valid and offers a new ticket or booking.
+At the office's final closing time (Vietnam time), waiting and called tickets
+are automatically cancelled with `cancellationReason: end_of_day`. Serving
+visits remain active. Linked appointments and past appointments that never
+entered the queue are cancelled too; completed and no-show results are preserved.
+The 15-second admission sweep also performs cancellation, including catch-up
+after a server restart. Student queue/appointment reads and staff actions run
+the same cleanup before accessing tickets. Lunch breaks do not end the day.
 
 ## Live staff queue
 

@@ -278,7 +278,7 @@ export default function AppointmentsPage() {
                     <p className="mt-2 text-sm font-medium text-slate-700">Total: {item.estimatedServiceTime} minutes</p>
                   </div>
                   <span
-                    className={`h-fit w-fit rounded-full px-3 py-1 text-xs font-semibold ${status === "Confirmed" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
+                    className={`h-fit w-fit rounded-full px-3 py-1 text-xs font-semibold ${status === "No-show" ? "bg-amber-50 text-amber-800" : status === "Confirmed" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
                   >
                     {status}
                   </span>
@@ -300,6 +300,23 @@ export default function AppointmentsPage() {
                   </span>
                 </div>
                 {item.queueAdmissionBlocked && <p role="status" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Your appointment is ready to enter the queue, but you have another active ticket. <Link to="/queue" className="font-semibold underline">View My Queue</Link> and finish or cancel that ticket first.</p>}
+                {item.serviceStatus === "no_show" && (
+                  <div role="status" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    <p className="font-semibold">You missed your turn. This ticket is no longer valid.</p>
+                    <p className="mt-1">Staff marked this visit as a no-show because you were not present when called. If you arrive later, please get a new ticket while the office is accepting students, or book another appointment.</p>
+                    <div className="mt-3 flex flex-wrap gap-4 font-semibold underline">
+                      <Link to="/">Get a new ticket</Link>
+                      <Link to="/appointments/new">Book another appointment</Link>
+                    </div>
+                  </div>
+                )}
+                {item.status === "cancelled" && item.cancellationReason === "end_of_day" && (
+                  <div role="status" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    <p className="font-semibold">The service day has ended. This visit was automatically cancelled.</p>
+                    <p className="mt-1">Your ticket is no longer valid. Please get a new ticket on the next working day or book another appointment.</p>
+                    <Link to="/appointments/new" className="mt-3 inline-block font-semibold underline">Book another appointment</Link>
+                  </div>
+                )}
                 <div className="mt-5 flex flex-wrap justify-between gap-3 border-t border-slate-100 pt-4">
                   <button
                     type="button"

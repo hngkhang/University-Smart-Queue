@@ -30,6 +30,7 @@ export interface Appointment {
   endsAt: string;
   notes: string;
   status: "confirmed" | "cancelled";
+  cancellationReason?: "end_of_day" | null;
   serviceStatus?: QueueTicket["status"] | null;
   queueReference?: string | null;
   queueAdmissionBlocked?: boolean;
@@ -64,6 +65,7 @@ export interface QueueTicket {
   startedAt?: string | null;
   completedAt?: string | null;
   cancelledAt?: string | null;
+  cancellationReason?: "end_of_day" | null;
   noShowAt?: string | null;
   assignedStaffName?: string;
   statusHistory?: { status: QueueTicket["status"]; at: string }[];

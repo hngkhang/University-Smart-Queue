@@ -17,6 +17,7 @@ const schema = new mongoose.Schema({
   notes: { type: String, default: "", maxlength: 1000 },
   status: { type: String, enum: ["confirmed", "cancelled"], default: "confirmed" },
   cancelledAt: { type: Date, default: null },
+  cancellationReason: { type: String, enum: ["end_of_day"], default: null },
 }, { collection: "appointments", timestamps: true });
 
 // Each document reserves all minutes in [start, end) atomically. These unique

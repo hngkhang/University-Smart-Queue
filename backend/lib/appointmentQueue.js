@@ -1,6 +1,8 @@
 const Appointment = require("../models/Appointment");
 const QueueTicket = require("../models/QueueTicket");
 const QueueSequence = require("../models/QueueSequence");
+const Department = require("../models/Department");
+const { dayEndsAt, cancelEndedTickets } = require("./ticketExpiry");
 
 const EARLY_MINUTES = 5;
 const activeStatuses = ["waiting", "called", "serving"];
@@ -9,6 +11,7 @@ const vietnamDate = (date) => new Intl.DateTimeFormat("en-CA", {
 }).format(date);
 
 async function admitDueAppointments({ now = new Date(), department, student } = {}) {
+  await cancelEndedTickets({ now, department, student });
   const today = vietnamDate(now);
   const due = await Appointment.find({
     status: "confirmed",
@@ -21,6 +24,8 @@ async function admitDueAppointments({ now = new Date(), department, student } = 
   }).sort({ startsAt: 1, _id: 1 }).lean();
   let admitted = 0;
   for (const appointment of due) {
+    const office = await Department.findById(appointment.department).select("workingHours").lean();
+    if (!office || now >= dayEndsAt(today, office.workingHours)) continue;
     if (await QueueTicket.exists({ appointment: appointment._id })) continue;
     // Keep one active queue position per student. Retry on the next sweep if a
     // walk-in ticket is still active when the appointment becomes due.

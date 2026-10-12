@@ -80,7 +80,7 @@ export default function MyQueuePage() {
           const previous = lastTicket.current;
           const updated = previous && (result.ticket?._id === previous._id ? result.ticket : result.history.find((item) => item._id === previous._id));
           if (updated && previous && updated.status !== previous.status) {
-            setNotice(`${updated.reference}: ${labels[updated.status]}.${updated.status === "no_show" ? " You missed your turn. You can join the queue again." : updated.status === "cancelled" ? " Your ticket was cancelled. You can join the queue again." : updated.status === "completed" ? " Your visit is complete." : ""}`);
+            setNotice(`${updated.reference}: ${labels[updated.status]}.${updated.status === "no_show" ? " You missed your turn. You can join the queue again." : updated.status === "cancelled" ? updated.cancellationReason === "end_of_day" ? " The service day has ended. Get a new ticket on the next working day or book another appointment." : " Your ticket was cancelled. You can join the queue again." : updated.status === "completed" ? " Your visit is complete." : ""}`);
             setConfirmCancel(false);
           }
           lastTicket.current = result.ticket;
@@ -427,6 +427,11 @@ export default function MyQueuePage() {
                   {labels[item.status]}
                 </span>
                 <div className="w-full"><TicketProgress ticket={item} /></div>
+                {item.status === "cancelled" && item.cancellationReason === "end_of_day" && (
+                  <p className="w-full rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+                    The service day has ended and this ticket was automatically cancelled. Please get a new ticket on the next working day or <Link to="/appointments/new" className="font-semibold underline">book another appointment</Link>.
+                  </p>
+                )}
               </article>
             ))}
           </div>
