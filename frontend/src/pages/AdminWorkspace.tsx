@@ -5,6 +5,7 @@ import {
   ArrowDownLeft,
   ArrowRight,
   ArrowUpRight,
+  Building2,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -38,11 +39,13 @@ import type {
   PasswordRequest,
 } from "../services/admin";
 import AppDialog from "../components/AppDialog";
+import AdminDepartments from "./AdminDepartments";
 import "../styles/admin.css";
 
 const links = [
   { path: "/admin", label: "Overview", icon: LayoutDashboard },
   { path: "/admin/users", label: "User Management", icon: Users },
+  { path: "/admin/departments", label: "Departments", icon: Building2 },
   { path: "/admin/requests", label: "Password Requests", icon: KeyRound },
   { path: "/admin/activity", label: "Activity Log", icon: History },
 ];
@@ -398,6 +401,7 @@ function AdminPage({ name }: { name: string }) {
   const isOverview = name === "Overview";
   const isUsers = name === "User Management";
   const isActivity = name === "Activity Log";
+  const isDepartments = name === "Departments";
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setQuery(search);
@@ -406,6 +410,7 @@ function AdminPage({ name }: { name: string }) {
     return () => window.clearTimeout(timer);
   }, [search]);
   useEffect(() => {
+    if (isDepartments) return;
     const controller = new AbortController();
     let inFlight = false;
     async function load(showLoading = true) {
@@ -460,7 +465,7 @@ function AdminPage({ name }: { name: string }) {
       controller.abort();
       window.clearInterval(interval);
     };
-  }, [isOverview, isUsers, isActivity, query, page, role, status, refresh]);
+  }, [isOverview, isUsers, isActivity, isDepartments, query, page, role, status, refresh]);
   const result = isUsers ? users : requests;
   const descriptions: Record<string, string> = {
     Overview: "A clear view of accounts and requests that need your attention.",
@@ -470,6 +475,7 @@ function AdminPage({ name }: { name: string }) {
       "Verify account owners and help them get back to their work.",
     "Activity Log":
       "A record of password requests resolved by your admin team.",
+    Departments: "Add and manage university service departments.",
   };
   return (
     <div className="aw-app">
@@ -570,14 +576,14 @@ function AdminPage({ name }: { name: string }) {
               <h1>{isOverview ? "Your workspace, at a glance." : name}</h1>
               <p>{descriptions[name]}</p>
             </div>
-            <button
+            {!isDepartments && <button
               className="sq-button"
               disabled={loading}
               onClick={() => setRefresh((v) => v + 1)}
             >
               <RefreshCw size={15} />
               {loading ? "Updating…" : "Refresh"}
-            </button>
+            </button>}
           </div>
           {message && (
             <div className="sq-notice sq-success aw-feedback" role="status">
@@ -677,7 +683,8 @@ function AdminPage({ name }: { name: string }) {
               </div>
             </>
           )}
-          <div className={isOverview ? "aw-overview-grid" : ""}>
+          {isDepartments && <AdminDepartments />}
+          {!isDepartments && <div className={isOverview ? "aw-overview-grid" : ""}>
             <section className="aw-panel" aria-busy={loading}>
               <div className="aw-panel-heading">
                 <div>
@@ -997,13 +1004,13 @@ function AdminPage({ name }: { name: string }) {
                 </div>
               </aside>
             )}
-          </div>
+          </div>}
           <footer className="aw-footer">
             <span>HCMUTE · SmartQueue administration</span>
             <span>
               {updatedAt
                 ? `Last updated ${date(updatedAt)} (ICT)`
-                : "Connecting to account services"}
+                : isDepartments ? "Department management" : "Connecting to account services"}
             </span>
           </footer>
         </main>

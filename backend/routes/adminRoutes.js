@@ -10,6 +10,7 @@ router.use((_req, res, next) => {
   res.set("Cache-Control", "no-store");
   next();
 });
+router.use("/departments", require("./adminDepartmentRoutes"));
 const roles = { role: { $in: ["student", "staff"] } };
 const search = (value) => {
   const term = typeof value === "string" ? value.trim().slice(0, 100) : "";
