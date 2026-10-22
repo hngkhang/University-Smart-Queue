@@ -161,6 +161,36 @@ and after; concurrent bookings can cause that check to report a change. Repeated
 runs are safe when the old indexes have already been removed. Restart an API
 started without automatic reload to pick up the updated error handling.
 
+## Admin user management
+
+The User Management screen supports creating and editing student/staff accounts,
+assigning staff departments, and disabling/enabling accounts while keeping their
+history. Search by name, email or student ID and filter by role/status.
+
+All routes below require an active admin session:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/api/admin/users?search=...&role=student&status=active&page=1` | List 12 accounts per page; role/status filters are optional |
+| POST | `/api/admin/users` | Create an active student/staff account with an initial password |
+| PUT | `/api/admin/users/:id` | Edit profile and role/department |
+| PATCH | `/api/admin/users/:id/status` | Enable/disable with boolean `isActive` |
+
+Create/edit fields: `fullName`, `email`, `role`, optional `phone`, `studentID`
+(required for students), and `department` (required for staff). Creation also
+requires matching `password`/`confirmation`, at least 8 characters and at most
+72 UTF-8 bytes. New staff assignments require an active, unarchived department.
+Emails are normalized and the unique email index rejects duplicate accounts.
+Admin accounts cannot be created or modified through these endpoints.
+
+Edits/status changes require the `updatedAt` value returned by the list or last
+mutation (explicit `null` for legacy accounts without timestamps); stale updates
+return 409. Profile and status changes revoke previous
+sessions, including after re-enabling an account. Passwords are changed through
+the existing Password Requests workflow. Staff must finish/cancel a current
+visit before disabling their account or changing their role/office. Students
+must resolve active tickets/upcoming appointments before changing roles.
+
 ## Verification
 
 `npm test` runs integration tests against MongoDB using a unique, temporary

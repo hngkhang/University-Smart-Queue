@@ -16,9 +16,10 @@ export interface Account {
   phone: string;
   isActive: boolean;
   createdAt: string;
+  updatedAt: string | null;
   department: { _id: string; name: string } | null;
 }
-export interface PasswordRequest extends Omit<Account, "department"> {
+export interface PasswordRequest extends Omit<Account, "department" | "updatedAt"> {
   userId: string;
   department: string;
   note: string;

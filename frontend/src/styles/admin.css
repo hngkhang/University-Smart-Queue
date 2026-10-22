@@ -1169,6 +1169,15 @@
 .aw-department-feedback { margin-bottom: 18px; }
 .aw-department-row-actions { gap: 16px; }
 .aw-department-delete { color: #b42338; }
+.aw-user-filters, .aw-user-row-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.aw-user-fields { border: 0; padding: 0; min-width: 0; }
+.aw-user-fields:disabled { opacity: 0.65; }
+.aw-user-fields select {
+  width: 100%; padding: 12px 14px; border: 1px solid #cbd5e1;
+  border-radius: 10px; background: white; color: #142a42; font: inherit;
+}
+.aw-user-fields select:focus-visible { outline: 3px solid #245de4; outline-offset: 3px; }
+.aw-user-notice { margin-top: 18px; }
 .aw-department-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

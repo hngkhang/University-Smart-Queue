@@ -19,6 +19,8 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Pencil,
+  Plus,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -40,6 +42,7 @@ import type {
 } from "../services/admin";
 import AppDialog from "../components/AppDialog";
 import AdminDepartments from "./AdminDepartments";
+import AdminUserForm, { UserStatusDialog } from "./AdminUserForm";
 import "../styles/admin.css";
 
 const links = [
@@ -389,6 +392,7 @@ function AdminPage({ name }: { name: string }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("pending");
   const [role, setRole] = useState("");
+  const [accountStatus, setAccountStatus] = useState("");
   const [page, setPage] = useState(1);
   const [refresh, setRefresh] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -397,6 +401,8 @@ function AdminPage({ name }: { name: string }) {
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [selected, setSelected] = useState<PasswordRequest | null>(null);
   const [account, setAccount] = useState<Account | null>(null);
+  const [editing, setEditing] = useState<{ account: Account | null } | null>(null);
+  const [changingStatus, setChangingStatus] = useState<Account | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const isOverview = name === "Overview";
   const isUsers = name === "User Management";
@@ -423,7 +429,10 @@ function AdminPage({ name }: { name: string }) {
           page: String(page),
           search: query,
         });
-        if (isUsers) params.set("role", role);
+        if (isUsers) {
+          params.set("role", role);
+          params.set("status", accountStatus);
+        }
         else if (isActivity) params.set("activity", "true");
         else params.set("status", isOverview ? "pending" : status);
         const [counts, list, recent] = await Promise.all([
@@ -465,12 +474,19 @@ function AdminPage({ name }: { name: string }) {
       controller.abort();
       window.clearInterval(interval);
     };
-  }, [isOverview, isUsers, isActivity, isDepartments, query, page, role, status, refresh]);
+  }, [isOverview, isUsers, isActivity, isDepartments, query, page, role, status, accountStatus, refresh]);
+  function userSaved(text: string) {
+    setEditing(null);
+    setChangingStatus(null);
+    setMessage(text);
+    setLoading(true);
+    setRefresh((value) => value + 1);
+  }
   const result = isUsers ? users : requests;
   const descriptions: Record<string, string> = {
     Overview: "A clear view of accounts and requests that need your attention.",
     "User Management":
-      "Find student and staff accounts across your university.",
+      "Create accounts, manage profiles and control access across your university.",
     "Password Requests":
       "Verify account owners and help them get back to their work.",
     "Activity Log":
@@ -711,6 +727,7 @@ function AdminPage({ name }: { name: string }) {
                     View all <ArrowUpRight size={16} />
                   </Link>
                 )}
+                {isUsers && <button className="sq-button sq-button-primary" onClick={() => setEditing({ account: null })}><Plus size={16} /> Add account</button>}
               </div>
               {!isOverview && (
                 <div className="aw-filters">
@@ -732,6 +749,7 @@ function AdminPage({ name }: { name: string }) {
                     )}
                   </div>
                   {isUsers ? (
+                    <div className="aw-user-filters">
                     <select
                       aria-label="Filter by role"
                       value={role}
@@ -744,6 +762,10 @@ function AdminPage({ name }: { name: string }) {
                       <option value="student">Students</option>
                       <option value="staff">Staff</option>
                     </select>
+                    <select aria-label="Filter by account status" value={accountStatus} onChange={(e) => { setAccountStatus(e.target.value); setPage(1); }}>
+                      <option value="">All statuses</option><option value="active">Active</option><option value="disabled">Disabled</option>
+                    </select>
+                    </div>
                   ) : (
                     !isActivity && (
                       <div
@@ -789,7 +811,7 @@ function AdminPage({ name }: { name: string }) {
                     <Inbox size={29} />
                   </span>
                   <h3>
-                    {query
+                    {query || (isUsers && (role || accountStatus))
                       ? "No matching results"
                       : isUsers
                         ? "No accounts yet"
@@ -800,7 +822,9 @@ function AdminPage({ name }: { name: string }) {
                             : "No requests here yet"}
                   </h3>
                   <p>
-                    {query
+                    {isUsers
+                      ? query || role || accountStatus ? "Try another search or clear the filters." : "Add a student or staff account to get started."
+                      : query
                       ? "Try another name, email, or student ID."
                       : isActivity
                         ? "Resolved requests will appear here with the admin and time."
@@ -865,12 +889,16 @@ function AdminPage({ name }: { name: string }) {
                                   />
                                 </td>
                                 <td>
+                                  <div className="aw-user-row-actions">
                                   <button
                                     className="aw-row-action"
                                     onClick={() => setAccount(user)}
                                   >
                                     Details <ChevronRight size={14} />
                                   </button>
+                                  <button className="aw-row-action" onClick={() => setEditing({ account: user })} aria-label={`Edit ${user.fullName}`}><Pencil size={14} /> Edit</button>
+                                  <button className={`aw-row-action ${user.isActive ? "aw-department-delete" : ""}`} onClick={() => setChangingStatus(user)} aria-label={`${user.isActive ? "Disable" : "Enable"} ${user.fullName}`}>{user.isActive ? "Disable" : "Enable"}</button>
+                                  </div>
                                 </td>
                               </tr>
                             ))
@@ -1029,6 +1057,8 @@ function AdminPage({ name }: { name: string }) {
       {account && (
         <UserDetails account={account} onClose={() => setAccount(null)} />
       )}
+      {editing && <AdminUserForm account={editing.account} onClose={() => setEditing(null)} onSaved={userSaved} />}
+      {changingStatus && <UserStatusDialog account={changingStatus} onClose={() => setChangingStatus(null)} onSaved={userSaved} />}
     </div>
   );
 }
