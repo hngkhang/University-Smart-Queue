@@ -36,7 +36,11 @@ export default function AppointmentsPage() {
   }, []);
   useEffect(() => {
     let active = true;
-    fetchAppointments()
+    let pending = false;
+    const load = () => {
+      if (pending) return;
+      pending = true;
+      fetchAppointments()
       .then((data) => {
         if (active) {
           setAppointments(data.appointments);
@@ -57,22 +61,30 @@ export default function AppointmentsPage() {
         }
       })
       .finally(() => {
+        pending = false;
         if (active) setLoading(false);
       });
+    };
+    load();
+    const timer = window.setInterval(() => { if (!document.hidden) load(); }, 5000);
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
     return () => {
       active = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
     };
   }, [retry]);
 
   const upcoming = appointments
     .filter(
       (item) =>
-        item.status === "confirmed" && new Date(item.endsAt).getTime() > now,
+        item.status === "confirmed" && !["completed", "cancelled", "no_show"].includes(item.serviceStatus || "") && new Date(item.endsAt).getTime() > now,
     )
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   const history = appointments.filter(
     (item) =>
-      item.status === "cancelled" || new Date(item.endsAt).getTime() <= now,
+      item.status === "cancelled" || ["completed", "cancelled", "no_show"].includes(item.serviceStatus || "") || new Date(item.endsAt).getTime() <= now,
   );
   const visible = tab === "upcoming" ? upcoming : history;
 
@@ -237,14 +249,14 @@ export default function AppointmentsPage() {
           !loading &&
           visible.map((item) => {
             const future = new Date(item.startsAt).getTime() > now;
-            const status =
-              item.status === "cancelled"
-                ? "Cancelled"
-                : new Date(item.endsAt).getTime() <= now
-                  ? "Past"
-                  : future
-                    ? "Confirmed"
-                    : "Scheduled now";
+            const serviceLabels: Record<string, string> = {
+              no_show: "No-show", completed: "Completed", called: "Called",
+              serving: "In service", waiting: "In queue",
+            };
+            const status = item.status === "cancelled" ? "Cancelled"
+              : item.serviceStatus ? serviceLabels[item.serviceStatus] || "Past"
+                : new Date(item.endsAt).getTime() <= now ? "Past"
+                  : future ? "Confirmed" : "Scheduled now";
             return (
               <article
                 key={item._id}
@@ -266,7 +278,7 @@ export default function AppointmentsPage() {
                     <p className="mt-2 text-sm font-medium text-slate-700">Total: {item.estimatedServiceTime} minutes</p>
                   </div>
                   <span
-                    className={`h-fit w-fit rounded-full px-3 py-1 text-xs font-semibold ${status === "Confirmed" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
+                    className={`h-fit w-fit rounded-full px-3 py-1 text-xs font-semibold ${status === "No-show" ? "bg-amber-50 text-amber-800" : status === "Confirmed" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
                   >
                     {status}
                   </span>
@@ -281,11 +293,30 @@ export default function AppointmentsPage() {
                     {appointmentTime(item.startsAt)} –{" "}
                     {appointmentTime(item.endsAt)} (UTC+7)
                   </span>
+                  {item.queueReference && <Link to="/queue" className="font-semibold text-[#3F6392]">Queue ticket {item.queueReference}</Link>}
                   <span className="inline-flex items-center gap-2">
                     <MapPin size={16} className="text-slate-400" />
                     {item.location}
                   </span>
                 </div>
+                {item.queueAdmissionBlocked && <p role="status" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Your appointment is ready to enter the queue, but you have another active ticket. <Link to="/queue" className="font-semibold underline">View My Queue</Link> and finish or cancel that ticket first.</p>}
+                {item.serviceStatus === "no_show" && (
+                  <div role="status" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    <p className="font-semibold">You missed your turn. This ticket is no longer valid.</p>
+                    <p className="mt-1">Staff marked this visit as a no-show because you were not present when called. If you arrive later, please get a new ticket while the office is accepting students, or book another appointment.</p>
+                    <div className="mt-3 flex flex-wrap gap-4 font-semibold underline">
+                      <Link to="/">Get a new ticket</Link>
+                      <Link to="/appointments/new">Book another appointment</Link>
+                    </div>
+                  </div>
+                )}
+                {item.status === "cancelled" && item.cancellationReason === "end_of_day" && (
+                  <div role="status" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    <p className="font-semibold">The service day has ended. This visit was automatically cancelled.</p>
+                    <p className="mt-1">Your ticket is no longer valid. Please get a new ticket on the next working day or book another appointment.</p>
+                    <Link to="/appointments/new" className="mt-3 inline-block font-semibold underline">Book another appointment</Link>
+                  </div>
+                )}
                 <div className="mt-5 flex flex-wrap justify-between gap-3 border-t border-slate-100 pt-4">
                   <button
                     type="button"
@@ -303,7 +334,7 @@ export default function AppointmentsPage() {
                       <ChevronDown size={16} />
                     )}
                   </button>
-                  {future && item.status === "confirmed" && (
+                  {future && item.status === "confirmed" && (!item.serviceStatus || item.serviceStatus === "waiting") && (
                     <button
                       type="button"
                       disabled={Boolean(cancelling)}

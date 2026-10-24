@@ -52,4 +52,4 @@ function reservedMinutes(startsAt, endsAt) {
   return result;
 }
 
-module.exports = { DEFAULT_WORKING_HOURS, validBookingDate, workingPeriods, slotsFor, reservedMinutes };
+module.exports = { DEFAULT_WORKING_HOURS, dateInVietnam, validBookingDate, workingPeriods, slotsFor, reservedMinutes };

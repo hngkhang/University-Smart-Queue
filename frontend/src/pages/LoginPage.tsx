@@ -78,12 +78,20 @@ function LoginPage() {
           password,
           rememberMe,
         }),
+      }).catch(() => {
+        throw new Error(
+          "Cannot connect to the server. Please check your connection and try again. If the problem continues, contact support.",
+        );
       });
 
-      const data = (await response.json()) as Partial<LoginResponse>;
+      const data = (await response.json().catch(() => {
+        throw new Error(
+          "The sign-in service is unavailable. Please try again later.",
+        );
+      })) as Partial<LoginResponse> | null;
 
-      if (!response.ok || !data.token || !data.user) {
-        throw new Error(data.message || "Unable to login right now.");
+      if (!response.ok || !data?.token || !data.user) {
+        throw new Error(data?.message || "Unable to login right now.");
       }
 
       const authenticatedUser = data.user;

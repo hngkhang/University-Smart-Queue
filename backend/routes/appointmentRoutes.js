@@ -5,6 +5,9 @@ const Department = require("../models/Department");
 const studentAuth = require("../middleware/studentAuth");
 const officeLocation = require("../lib/officeLocation");
 const { validBookingDate, slotsFor, reservedMinutes } = require("../lib/appointmentSchedule");
+const { isAppointmentOverlap } = require("../lib/appointmentIndexes");
+const QueueTicket = require("../models/QueueTicket");
+const { admitDueAppointments } = require("../lib/appointmentQueue");
 
 const router = express.Router();
 router.use(studentAuth);
@@ -13,6 +16,28 @@ router.use((_req, res, next) => { res.set("Cache-Control", "no-store"); next(); 
 function response(appointment) {
   const { reservedMinutes: _minutes, student: _student, __v: _version, ...result } = appointment;
   return { ...result, reference: `APT-${appointment._id}` };
+}
+
+async function withQueueStatus(appointments, student) {
+  const [tickets, active] = await Promise.all([
+    QueueTicket.find({ appointment: { $in: appointments.map((item) => item._id) } })
+      .select("appointment number status").lean(),
+    student ? QueueTicket.findOne({ student, status: { $in: ["waiting", "called", "serving"] } })
+      .select("appointment").lean() : null,
+  ]);
+  const byAppointment = new Map(tickets.map((ticket) => [String(ticket.appointment), ticket]));
+  const now = Date.now();
+  const vietnamToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(now);
+  const todayStartsAt = new Date(`${vietnamToday}T00:00:00+07:00`).getTime();
+  return appointments.map((appointment) => {
+    const ticket = byAppointment.get(String(appointment._id));
+    const scheduled = new Date(appointment.startsAt).getTime();
+    return { ...response(appointment), serviceStatus: ticket?.status || null,
+      queueReference: ticket ? `Q-${String(ticket.number).padStart(3, "0")}` : null,
+      queueAdmissionBlocked: !ticket && !!active && appointment.status === "confirmed" &&
+        scheduled <= now + 5 * 60000 && scheduled >= todayStartsAt,
+    };
+  });
 }
 
 async function selection(input, res) {
@@ -64,8 +89,9 @@ router.get("/availability", async (req, res) => {
 });
 
 router.get("/", async (req, res) => {
+  await admitDueAppointments({ student: req.student._id });
   const appointments = await Appointment.find({ student: req.student._id }).sort({ startsAt: -1 }).lean();
-  res.json({ appointments: appointments.map(response) });
+  res.json({ appointments: await withQueueStatus(appointments, req.student._id) });
 });
 
 router.post("/", async (req, res) => {
@@ -93,7 +119,7 @@ router.post("/", async (req, res) => {
     });
     return res.status(201).json({ appointment: response(appointment.toObject()) });
   } catch (error) {
-    if (error.code === 11000) return res.status(409).json({
+    if (isAppointmentOverlap(error)) return res.status(409).json({
       message: "This time overlaps an existing appointment. Please choose another time.",
     });
     throw error;
@@ -102,16 +128,35 @@ router.post("/", async (req, res) => {
 
 router.patch("/:id/cancel", async (req, res) => {
   if (!mongoose.isObjectIdOrHexString(req.params.id)) return res.status(400).json({ message: "Invalid appointment." });
+  const now = new Date();
+  const eligible = await Appointment.findOne({
+    _id: req.params.id, student: req.student._id, status: "confirmed", startsAt: { $gt: now },
+  }).lean();
+  if (!eligible) return res.status(409).json({ message: "This appointment can no longer be cancelled. Refresh My Appointments." });
+  const linked = await QueueTicket.findOne({ appointment: req.params.id }).lean();
+  if (linked) {
+    if (linked.status !== "waiting") return res.status(409).json({ message: "This appointment is already being handled. Refresh My Appointments." });
+    const cancelled = await QueueTicket.findOneAndUpdate({ _id: linked._id, status: "waiting" }, {
+      $set: { status: "cancelled", cancelledAt: now },
+      $push: { statusHistory: { status: "cancelled", at: now, actor: req.student._id } },
+    }).lean();
+    if (!cancelled) return res.status(409).json({ message: "This appointment is already being handled. Refresh My Appointments." });
+  }
   const appointment = await Appointment.findOneAndUpdate({
-    _id: req.params.id, student: req.student._id, status: "confirmed", startsAt: { $gt: new Date() },
-  }, { $set: { status: "cancelled", cancelledAt: new Date() } }, { returnDocument: "after" }).lean();
+    _id: req.params.id, student: req.student._id, status: "confirmed", startsAt: { $gt: now },
+  }, { $set: { status: "cancelled", cancelledAt: now } }, { returnDocument: "after" }).lean();
   if (!appointment) return res.status(409).json({ message: "This appointment can no longer be cancelled. Refresh My Appointments." });
-  res.json({ appointment: response(appointment) });
+  // Admission may have created the linked ticket after the first lookup.
+  await QueueTicket.updateOne({ appointment: appointment._id, status: "waiting" }, {
+    $set: { status: "cancelled", cancelledAt: now },
+    $push: { statusHistory: { status: "cancelled", at: now, actor: req.student._id } },
+  });
+  res.json({ appointment: (await withQueueStatus([appointment]))[0] });
 });
 
 router.use((error, _req, res, _next) => {
-  console.error("Appointment request failed:", error.message);
-  res.status(500).json({ message: "Unable to update your appointment. Check My Appointments before trying again." });
+  console.error("Appointment request failed:", { code: error.code, keyPattern: error.keyPattern, message: error.message });
+  res.status(500).json({ message: "Appointment service is temporarily unavailable. Check My Appointments before trying again. If this continues, contact support." });
 });
 
 module.exports = router;

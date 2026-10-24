@@ -13,6 +13,8 @@ const ticketSchema = new mongoose.Schema(
       required: true,
     },
     departmentName: { type: String, required: true },
+    appointment: { type: mongoose.Schema.Types.ObjectId, ref: "Appointment", default: null },
+    appointmentStartsAt: { type: Date, default: null },
     serviceDate: { type: String, required: true },
     number: { type: Number, required: true },
     services: [
@@ -37,6 +39,20 @@ const ticketSchema = new mongoose.Schema(
       default: "waiting",
     },
     cancelledAt: { type: Date, default: null },
+    cancellationReason: { type: String, enum: ["end_of_day"], default: null },
+    calledAt: { type: Date, default: null },
+    lastCalledAt: { type: Date, default: null },
+    startedAt: { type: Date, default: null },
+    completedAt: { type: Date, default: null },
+    noShowAt: { type: Date, default: null },
+    assignedStaff: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    assignedStaffName: { type: String, default: "" },
+    statusHistory: [{
+      _id: false,
+      status: { type: String, enum: ["waiting", "called", "serving", "completed", "cancelled", "no_show"], required: true },
+      at: { type: Date, required: true },
+      actor: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    }],
   },
   { collection: "queue_tickets", timestamps: true },
 );
@@ -57,5 +73,19 @@ ticketSchema.index(
   { unique: true },
 );
 ticketSchema.index({ department: 1, status: 1, createdAt: 1 });
+ticketSchema.index({ appointment: 1 }, {
+  unique: true,
+  partialFilterExpression: { appointment: { $type: "objectId" } },
+  name: "one_ticket_per_appointment",
+});
+// A staff member can claim only one visit, even from concurrent browser tabs.
+ticketSchema.index({ assignedStaff: 1 }, {
+  unique: true,
+  partialFilterExpression: {
+    assignedStaff: { $type: "objectId" },
+    status: { $in: ["called", "serving"] },
+  },
+  name: "one_current_ticket_per_staff",
+});
 
 module.exports = mongoose.model("QueueTicket", ticketSchema);

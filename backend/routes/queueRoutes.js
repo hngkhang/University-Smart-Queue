@@ -6,6 +6,8 @@ const QueueTicket = require("../models/QueueTicket");
 const QueueSequence = require("../models/QueueSequence");
 const officeLocation = require("../lib/officeLocation");
 const studentAuth = require("../middleware/studentAuth");
+const { admitDueAppointments } = require("../lib/appointmentQueue");
+const { dayEndsAt } = require("../lib/ticketExpiry");
 
 const router = express.Router();
 const activeStatuses = ["waiting", "called", "serving"];
@@ -23,7 +25,7 @@ async function ticketResponse(ticket) {
   const [department, queue, peopleAhead] = await Promise.all([
     Department.findById(ticket.department).lean(),
     Queue.findOne({ department: ticket.department }).lean(),
-    active
+    ticket.status === "waiting"
       ? QueueTicket.countDocuments({
           department: ticket.department,
           status: { $in: activeStatuses },
@@ -32,20 +34,21 @@ async function ticketResponse(ticket) {
             { serviceDate: ticket.serviceDate, number: { $lt: ticket.number } },
           ],
         })
-      : Promise.resolve(null),
+      : Promise.resolve(active ? 0 : null),
   ]);
   return {
     ...ticket,
     reference: `Q-${String(ticket.number).padStart(3, "0")}`,
+    appointmentReference: ticket.appointment ? `APT-${ticket.appointment}` : null,
     location: officeLocation(department?.location),
     queueStatus:
-      !department?.isActive || !queue?.isOpen
+      !department?.isActive || !queue?.isOpen || new Date() >= dayEndsAt(serviceDate(), department?.workingHours)
         ? "closed"
         : queue.isPaused
           ? "paused"
           : "open",
     peopleAhead,
-    // Counter availability and service progress are not yet tracked.
+    // Wait estimates need counter availability and measured service durations.
     estimatedWait: null,
   };
 }
@@ -53,13 +56,14 @@ async function ticketResponse(ticket) {
 router.use(studentAuth);
 
 router.get("/mine", async (req, res) => {
+  await admitDueAppointments({ student: req.student._id });
   const [active, history] = await Promise.all([
     QueueTicket.findOne(activeFor(req.student._id)).lean(),
     QueueTicket.find({
       student: req.student._id,
       status: { $nin: activeStatuses },
     })
-      .sort({ createdAt: -1 })
+      .sort({ updatedAt: -1 })
       .limit(20)
       .lean(),
   ]);
@@ -70,6 +74,7 @@ router.get("/mine", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
+  await admitDueAppointments({ student: req.student._id });
   const { departmentId, services, notes = "" } = req.body || {};
   if (
     !mongoose.isObjectIdOrHexString(departmentId) ||
@@ -103,7 +108,7 @@ router.post("/", async (req, res) => {
   ]);
   if (!department)
     return res.status(404).json({ message: "Department not found." });
-  if (!department.isActive || !queue?.isOpen || queue.isPaused) {
+  if (!department.isActive || !queue?.isOpen || queue.isPaused || new Date() >= dayEndsAt(serviceDate(), department.workingHours)) {
     return res
       .status(409)
       .json({
@@ -146,6 +151,7 @@ router.post("/", async (req, res) => {
       number: sequence.value,
       services: snapshots,
       notes: notes.trim(),
+      statusHistory: [{ status: "waiting", at: new Date(), actor: req.student._id }],
       estimatedServiceTime: snapshots.every(
         (service) => service.estimatedDuration !== null,
       )
@@ -172,13 +178,18 @@ router.patch("/:id/cancel", async (req, res) => {
   if (!mongoose.isObjectIdOrHexString(req.params.id)) {
     return res.status(400).json({ message: "Invalid ticket." });
   }
+  const booked = await QueueTicket.findOne({ _id: req.params.id, student: req.student._id, appointment: { $type: "objectId" } }).lean();
+  if (booked) return res.status(409).json({ message: "Cancel this visit from My Appointments before its scheduled time." });
   const ticket = await QueueTicket.findOneAndUpdate(
     {
       _id: req.params.id,
       student: req.student._id,
       status: "waiting",
     },
-    { $set: { status: "cancelled", cancelledAt: new Date() } },
+    {
+      $set: { status: "cancelled", cancelledAt: new Date() },
+      $push: { statusHistory: { status: "cancelled", at: new Date(), actor: req.student._id } },
+    },
     { returnDocument: "after" },
   ).lean();
   if (!ticket)

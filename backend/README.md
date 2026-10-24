@@ -1,12 +1,30 @@
 # Queue API
 
-Run `npm install` and `npm run dev`. The existing `.env` needs `MONGODB_URI`
-and `JWT_SECRET`; `PORT` defaults to `5000`. The API starts after MongoDB
+Restore `backend/.env` from your existing setup, or copy `.env.example` to `.env`
+and fill in `MONGODB_URI` and `JWT_SECRET`. Use the existing database containing
+your student accounts; the local example only works if MongoDB is running locally.
+The `.env` file is ignored by Git and is not included when cloning the project.
+The server always loads the file from `backend/.env`, regardless of where it is started.
+
+In `backend`, run `npm install` and `npm run dev`.
+`PORT` defaults to `5000`. The API starts after MongoDB
 connects and the ticket and appointment indexes are ready.
 
 The frontend uses `VITE_API_URL`, defaulting to `http://127.0.0.1:5000/api`.
 Department service names and durations come from the existing `departments`
 collection. No reseeding is required.
+
+## Troubleshooting sign-in connections
+
+Start both the backend and frontend (`npm run dev` in each directory). Open
+`http://127.0.0.1:5000/api/health` and confirm `database` is `connected` before
+signing in. If this URL cannot be reached, check the backend terminal and
+`backend/.env`; `ECONNREFUSED 127.0.0.1:27017` means local MongoDB is unavailable.
+For Atlas, restore the correct URI and check its network access settings.
+If the backend port differs, set `VITE_API_URL` in `frontend/.env` to the matching
+API URL (including `/api`) and restart Vite. When opening the frontend from
+another device, use the backend machine's reachable address instead of
+`127.0.0.1`, and set `CLIENT_URL` to the frontend's exact origin.
 
 ## Student endpoints
 
@@ -35,10 +53,46 @@ Waiting-time estimates and active-counter counts are `null` until counter
 availability and service progress are implemented. Missing service durations
 also remain unknown instead of becoming zero-minute estimates.
 
-Staff calling/serving/completing tickets, automatic no-show handling, session
-expiry, and appointment capacity integration are not part of these endpoints.
-Until those workflows exist, students can leave the queue by cancelling a
-waiting ticket. A saved ticket does not automatically expire at midnight.
+Staff actions now move saved tickets through `waiting → called → serving → completed`.
+Students can cancel only waiting tickets. Staff can cancel a waiting ticket in
+their office or their own current visit; only a called visit can be marked
+`no_show`. Terminal tickets move to history and release the student's active
+ticket restriction. No-shows require an explicit staff action; My Appointments
+explains that the ticket is no longer valid and offers a new ticket or booking.
+At the office's final closing time (Vietnam time), waiting and called tickets
+are automatically cancelled with `cancellationReason: end_of_day`. Serving
+visits remain active. Linked appointments and past appointments that never
+entered the queue are cancelled too; completed and no-show results are preserved.
+The 15-second admission sweep also performs cancellation, including catch-up
+after a server restart. Student queue/appointment reads and staff actions run
+the same cleanup before accessing tickets. Lunch breaks do not end the day.
+
+## Live staff queue
+
+These endpoints require a signed JWT, an active staff account, and an assigned
+department read from the database. The browser cannot choose another department.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/api/staff/queue` | Office waiting list, staff member's current visit, last 50 terminal office visits, and today's completed count |
+| POST | `/api/staff/queue/call` | Atomically claim the oldest waiting ticket and mark it called |
+| PATCH | `/api/staff/tickets/:id/start` | Called → serving |
+| PATCH | `/api/staff/tickets/:id/complete` | Serving → completed |
+| PATCH | `/api/staff/tickets/:id/recall` | Update the last call time, preserving the first call time |
+| PATCH | `/api/staff/tickets/:id/no_show` | Called → no-show |
+| PATCH | `/api/staff/tickets/:id/cancel` | Cancel an office waiting ticket or the staff member's current visit |
+| PATCH | `/api/staff/queue/pause` | Set `{ "paused": true/false }` for the whole office |
+
+Conditional updates reject stale or invalid transitions with HTTP 409. A partial
+unique index limits each staff member to one called/serving ticket, including
+concurrent requests from different tabs. Queue order uses service date and ticket
+number. Pausing or closing prevents new calls; current visits can still finish.
+Each transition records its timestamp and actor in `statusHistory`; legacy
+tickets remain readable without fabricated timestamps. Restart the backend to
+load these routes and initialize the new index before using live staff actions.
+
+Both staff and student screens refresh every 5 seconds while visible and when
+returning to the page. The development preview continues to use isolated demo data.
 
 ## Appointment booking
 
@@ -70,9 +124,72 @@ single insert, preventing concurrent overlapping appointments for a department
 or student (including across departments). Adjacent visits are allowed.
 Cancellation removes the confirmed reservation from those indexes atomically.
 
-Booking is separate from live queue admission and does not create a queue ticket.
-Staff still uses its existing demo workspace; appointment check-in, staff handling,
-and shared capacity between walk-ins and appointments remain future work.
+Five minutes before an appointment starts, the backend creates one linked queue
+ticket for it. A 15-second server sweep performs admission even if nobody has
+the page open; staff and student queue reads also trigger a sweep after a restart.
+The ticket uses the same office sequence and staff actions as a walk-in. Staff
+see its appointment reference and scheduled time, and students see the queue
+number and live service status in My Queue and My Appointments. The unique
+`one_ticket_per_appointment` index prevents duplicate admission across API
+processes. Existing appointment reservations remain in force while staff serve
+the ticket. A student can cancel the appointment before its scheduled start
+while its linked ticket is waiting; staff can cancel a linked ticket at any
+stage, which also cancels the booking. If the student already has an active
+walk-in ticket, admission retries when that ticket leaves the active queue.
+Queue capacity is still separate from appointment slot capacity; the scheduled
+time reserves a booking interval, not a guaranteed moment when staff calls.
+
+### Repair legacy appointment indexes
+
+Older databases may retain unique indexes on `reference` and `occupiedMinutes`.
+Current bookings derive their reference from `_id` and store `reservedMinutes`;
+those obsolete constraints can reject available times because the old fields are
+missing. Only duplicate keys on the current reservation indexes produce a 409
+overlap response. Other database errors are logged and return a service error.
+
+From `backend`, run `npm run migrate:appointment-indexes` for a read-only preview,
+then `npm run migrate:appointment-indexes -- --apply` to apply the repair using
+`backend/.env`. Run this after deploying the current booking code to all API
+instances, so no old process writes `occupiedMinutes` during the migration.
+The script requires both current unique reservation indexes and validates every
+confirmed appointment's minute reservations before removing exactly
+`reference_1`, `department_1_occupiedMinutes_1`, and
+`student_1_occupiedMinutes_1`. Missing replacement indexes, invalid reservations,
+or unexpected legacy definitions stop the migration for review. The script does
+not update or delete appointment documents and checks their fingerprint before
+and after; concurrent bookings can cause that check to report a change. Repeated
+runs are safe when the old indexes have already been removed. Restart an API
+started without automatic reload to pick up the updated error handling.
+
+## Admin user management
+
+The User Management screen supports creating and editing student/staff accounts,
+assigning staff departments, and disabling/enabling accounts while keeping their
+history. Search by name, email or student ID and filter by role/status.
+
+All routes below require an active admin session:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/api/admin/users?search=...&role=student&status=active&page=1` | List 12 accounts per page; role/status filters are optional |
+| POST | `/api/admin/users` | Create an active student/staff account with an initial password |
+| PUT | `/api/admin/users/:id` | Edit profile and role/department |
+| PATCH | `/api/admin/users/:id/status` | Enable/disable with boolean `isActive` |
+
+Create/edit fields: `fullName`, `email`, `role`, optional `phone`, `studentID`
+(required for students), and `department` (required for staff). Creation also
+requires matching `password`/`confirmation`, at least 8 characters and at most
+72 UTF-8 bytes. New staff assignments require an active, unarchived department.
+Emails are normalized and the unique email index rejects duplicate accounts.
+Admin accounts cannot be created or modified through these endpoints.
+
+Edits/status changes require the `updatedAt` value returned by the list or last
+mutation (explicit `null` for legacy accounts without timestamps); stale updates
+return 409. Profile and status changes revoke previous
+sessions, including after re-enabling an account. Passwords are changed through
+the existing Password Requests workflow. Staff must finish/cancel a current
+visit before disabling their account or changing their role/office. Students
+must resolve active tickets/upcoming appointments before changing roles.
 
 ## Verification
 

@@ -18,15 +18,10 @@ import {
 } from "../services/queue";
 import { readSession, SESSION_CHANGED_EVENT } from "../services/session";
 import type { QueueTicket } from "../types";
+import TicketProgress from "../components/TicketProgress";
+import { ticketStatusLabels as labels } from "../services/queue";
+import { appointmentTime } from "../services/appointments";
 
-const labels: Record<QueueTicket["status"], string> = {
-  waiting: "Waiting",
-  called: "Your turn",
-  serving: "Being served",
-  completed: "Completed",
-  cancelled: "Cancelled",
-  no_show: "Missed turn",
-};
 const dateLabel = (value: string) =>
   new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Ho_Chi_Minh",
@@ -53,11 +48,14 @@ export default function MyQueuePage() {
   const [notice, setNotice] = useState("");
   const cancelLock = useRef(false);
   const revision = useRef(0);
+  const lastTicket = useRef<QueueTicket | null>(null);
 
   useEffect(() => {
     const update = () => {
       setSession(readSession());
       setData(null);
+      lastTicket.current = null;
+      setNotice("");
     };
     window.addEventListener(SESSION_CHANGED_EVENT, update);
     window.addEventListener("storage", update);
@@ -79,6 +77,13 @@ export default function MyQueuePage() {
       try {
         const result = await fetchMyQueue();
         if (active && requestRevision === revision.current) {
+          const previous = lastTicket.current;
+          const updated = previous && (result.ticket?._id === previous._id ? result.ticket : result.history.find((item) => item._id === previous._id));
+          if (updated && previous && updated.status !== previous.status) {
+            setNotice(`${updated.reference}: ${labels[updated.status]}.${updated.status === "no_show" ? " You missed your turn. You can join the queue again." : updated.status === "cancelled" ? updated.cancellationReason === "end_of_day" ? " The service day has ended. Get a new ticket on the next working day or book another appointment." : " Your ticket was cancelled. You can join the queue again." : updated.status === "completed" ? " Your visit is complete." : ""}`);
+            setConfirmCancel(false);
+          }
+          lastTicket.current = result.ticket;
           setData(result);
           setError("");
           setUnauthorized(false);
@@ -103,15 +108,18 @@ export default function MyQueuePage() {
     void load();
     const timer = window.setInterval(() => {
       if (!document.hidden) void load();
-    }, 15000);
+    }, 5000);
     const onFocus = () => {
       void load();
     };
     window.addEventListener("focus", onFocus);
+    const onVisible = () => { if (!document.hidden) void load(); };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       active = false;
       window.clearInterval(timer);
       window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [retry, session]);
 
@@ -130,6 +138,7 @@ export default function MyQueuePage() {
       }));
       setNotice("Your ticket has been cancelled. You can join a queue again.");
       setConfirmCancel(false);
+      lastTicket.current = null;
     } catch (reason) {
       setError(
         reason instanceof Error
@@ -143,6 +152,7 @@ export default function MyQueuePage() {
     } finally {
       cancelLock.current = false;
       setCancelling(false);
+      setRetry((value) => value + 1);
     }
   }
 
@@ -227,6 +237,7 @@ export default function MyQueuePage() {
               <p className="mt-3 text-5xl font-extrabold tracking-tight text-[#0B1F3A]">
                 {ticket.reference}
               </p>
+              {ticket.appointmentReference && <p className="mt-2 text-xs font-semibold text-[#3F6392]">Appointment {ticket.appointmentReference} · {ticket.appointmentStartsAt && appointmentTime(ticket.appointmentStartsAt)}</p>}
               <span className="mt-5 rounded-full border border-blue-200 bg-white px-4 py-1.5 text-xs font-bold text-[#3F6392]">
                 {labels[ticket.status]}
               </span>
@@ -262,6 +273,8 @@ export default function MyQueuePage() {
                     : "Your services are being handled by the department."}
                 </p>
               )}
+              {ticket.assignedStaffName && <p className="mt-3 text-sm text-slate-600">Serving staff: {ticket.assignedStaffName}</p>}
+              <TicketProgress ticket={ticket} />
               <div className="mt-6 grid grid-cols-2 gap-3">
                 <div className="rounded-xl bg-slate-50 p-4">
                   <Users size={18} className="text-[#3F6392]" />
@@ -321,10 +334,10 @@ export default function MyQueuePage() {
           </div>
           <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 px-6 py-4">
             <p className="max-w-md text-xs leading-5 text-slate-500">
-              Updates automatically every 15 seconds. Please be at the
+              Updates automatically every 5 seconds. Please be at the
               department when your number is called.
             </p>
-            {ticket.status === "waiting" && !confirmCancel && (
+            {ticket.status === "waiting" && !ticket.appointmentReference && !confirmCancel && (
               <button
                 type="button"
                 onClick={() => setConfirmCancel(true)}
@@ -333,7 +346,8 @@ export default function MyQueuePage() {
                 Cancel ticket
               </button>
             )}
-            {ticket.status === "waiting" && confirmCancel && (
+            {ticket.status === "waiting" && ticket.appointmentReference && <Link to="/appointments" className="text-sm font-semibold text-[#3F6392]">Manage appointment</Link>}
+            {ticket.status === "waiting" && !ticket.appointmentReference && confirmCancel && (
               <div className="w-full rounded-xl border border-red-100 bg-red-50 p-4">
                 <p className="text-sm font-semibold text-red-800">
                   Cancel this ticket and leave the queue?
@@ -412,6 +426,12 @@ export default function MyQueuePage() {
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
                   {labels[item.status]}
                 </span>
+                <div className="w-full"><TicketProgress ticket={item} /></div>
+                {item.status === "cancelled" && item.cancellationReason === "end_of_day" && (
+                  <p className="w-full rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+                    The service day has ended and this ticket was automatically cancelled. Please get a new ticket on the next working day or <Link to="/appointments/new" className="font-semibold underline">book another appointment</Link>.
+                  </p>
+                )}
               </article>
             ))}
           </div>

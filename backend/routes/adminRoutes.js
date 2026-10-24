@@ -10,6 +10,8 @@ router.use((_req, res, next) => {
   res.set("Cache-Control", "no-store");
   next();
 });
+router.use("/departments", require("./adminDepartmentRoutes"));
+router.use("/users", require("./adminUserRoutes"));
 const roles = { role: { $in: ["student", "staff"] } };
 const search = (value) => {
   const term = typeof value === "string" ? value.trim().slice(0, 100) : "";
@@ -55,33 +57,6 @@ router.get("/summary", async (_req, res, next) => {
     const result = { students, staff, pending: 0, completed: 0, rejected: 0 };
     for (const row of counts) result[row._id] = row.count;
     res.json(result);
-  } catch (error) {
-    next(error);
-  }
-});
-router.get("/users", async (req, res, next) => {
-  try {
-    const filter = {
-      ...roles,
-      ...search(req.query.search),
-      ...(["student", "staff"].includes(req.query.role)
-        ? { role: req.query.role }
-        : {}),
-    };
-    const page = pageNumber(req.query.page);
-    const [items, total] = await Promise.all([
-      User.find(filter)
-        .select(
-          "fullName email role studentID phone department isActive createdAt",
-        )
-        .populate({ path: "department", model: "Department", select: "name" })
-        .sort({ fullName: 1, _id: 1 })
-        .skip((page - 1) * PAGE_SIZE)
-        .limit(PAGE_SIZE)
-        .lean(),
-      User.countDocuments(filter),
-    ]);
-    res.json({ items, total, page, pageSize: PAGE_SIZE });
   } catch (error) {
     next(error);
   }

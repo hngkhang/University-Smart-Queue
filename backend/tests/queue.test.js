@@ -61,8 +61,8 @@ before(async () => {
     { name: "Unknown", estimatedDuration: 0 },
   ];
   [department, otherDepartment] = await Department.create([
-    { name: "Test Registrar", services },
-    { name: "Test Finance", services },
+    { name: "Test Registrar", services, workingHours: "00:00 - 23:59" },
+    { name: "Test Finance", services, workingHours: "00:00 - 23:59" },
   ]);
   await Queue.create([
     { department: department._id, isOpen: true },

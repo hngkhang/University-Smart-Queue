@@ -2,13 +2,15 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const mongoose = require("mongoose");
+const path = require("node:path");
 const authRoutes = require("./routes/authRoutes");
 const departmentRoutes = require("./routes/departmentRoutes");
 const queueRoutes = require("./routes/queueRoutes");
 const QueueTicket = require("./models/QueueTicket");
 const Appointment = require("./models/Appointment");
+const { admitDueAppointments } = require("./lib/appointmentQueue");
 
-dotenv.config({ quiet: true });
+dotenv.config({ path: path.join(__dirname, ".env"), quiet: true });
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -59,6 +61,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/departments", departmentRoutes);
 app.use("/api/queue", queueRoutes);
+app.use("/api/staff", require("./routes/staffRoutes"));
 app.use("/api/appointments", require("./routes/appointmentRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
 app.use((error, _req, res, _next) => {
@@ -73,10 +76,18 @@ mongoose
   .then(async () => {
     await Promise.all([QueueTicket.init(), Appointment.init()]);
     console.log("Connected to MongoDB");
+    const admit = () => admitDueAppointments().catch((error) => console.error("Appointment queue admission failed:", error));
+    void admit();
+    setInterval(admit, 15000).unref();
     app.listen(port, () => {
       console.log(`Server is running on port ${port}`);
     });
   })
   .catch((error) => {
-    console.error("MongoDB connection error:", error.message);
+    console.error("API could not start:", error.message);
+    console.error(
+      "Check MONGODB_URI in backend/.env and make sure MongoDB is reachable. " +
+        "The login page cannot connect until the API starts successfully.",
+    );
+    process.exitCode = 1;
   });
