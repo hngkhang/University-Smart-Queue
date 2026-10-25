@@ -3,6 +3,7 @@ import { Sparkles } from "lucide-react";
 import { readSession, SESSION_CHANGED_EVENT } from "../../../services/session";
 import { useFloatingPosition } from "../hooks/useFloatingPosition";
 import { useAssistant } from "../hooks/useAssistant";
+import { useBookingDraft } from "../hooks/useBookingDraft";
 import AssistantPanel from "./AssistantPanel";
 import "../styles/assistant.css";
 
@@ -18,8 +19,10 @@ const sessionIdentity = () => readSession()?.user.id || "guest";
 
 function Widget() {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"chat" | "booking">("chat");
   const floating = useFloatingPosition();
-  const assistant = useAssistant(open);
+  const assistant = useAssistant(open && mode === "chat");
+  const booking = useBookingDraft(open && mode === "booking");
   return <>
     <button type="button" className={`sq-ai-launcher${floating.dragging ? " is-dragging" : ""}`} style={{ left: floating.position.x, top: floating.position.y }}
       {...floating.handlers}
@@ -29,7 +32,7 @@ function Widget() {
       <Sparkles size={25} strokeWidth={1.65} aria-hidden="true" />
       <span className="sq-ai-launcher-label" aria-hidden="true">Trợ lý thủ tục</span>
     </button>
-    {open && <AssistantPanel assistant={assistant} onClose={() => setOpen(false)} onDock={floating.dock} />}
+    {open && <AssistantPanel assistant={assistant} booking={booking} mode={mode} setMode={setMode} onClose={() => setOpen(false)} onDock={floating.dock} />}
   </>;
 }
 

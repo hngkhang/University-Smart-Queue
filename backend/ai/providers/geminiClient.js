@@ -22,7 +22,7 @@ async function embedQuery(question, options = {}) {
   } catch (error) { throw providerError(error); }
 }
 
-async function generateText({ system, question, context }, { fetchImpl = fetch, signal } = {}) {
+async function generateStructured({ system, input, schema, jsonSchema = false }, { fetchImpl = fetch, signal } = {}) {
   const config = getAiConfig();
   const key = process.env.GEMINI_API_KEY?.trim();
   if (!key) throw new AiError("AI_NOT_CONFIGURED", "Trợ lý chưa được cấu hình kết nối AI.");
@@ -34,17 +34,12 @@ async function generateText({ system, question, context }, { fetchImpl = fetch, 
       signal: signal || AbortSignal.timeout(config.timeoutMs),
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
-        contents: [{ role: "user", parts: [{ text: JSON.stringify({ question, referencePassages: context }) }] }],
+        contents: [{ role: "user", parts: [{ text: JSON.stringify(input) }] }],
         generationConfig: {
           maxOutputTokens: 2048,
           ...(model === "gemini-3.5-flash-lite" ? { thinkingConfig: { thinkingLevel: "minimal" } } : {}),
           responseMimeType: "application/json",
-          responseSchema: {
-            type: "OBJECT", properties: { supported: { type: "BOOLEAN" }, answer: { type: "STRING" },
-              sourceIds: { type: "ARRAY", items: { type: "STRING", enum: context.map(passage => passage.sourceId) } },
-            },
-            required: ["supported", "answer", "sourceIds"],
-          },
+          [jsonSchema ? "responseJsonSchema" : "responseSchema"]: schema,
         },
       }),
     });
@@ -61,11 +56,23 @@ async function generateText({ system, question, context }, { fetchImpl = fetch, 
     const text = candidate.content?.parts?.filter(part => !part.thought).map(part => part.text || "").join("");
     let result;
     try { result = JSON.parse(text); } catch { throw new AiError("AI_INVALID_ANSWER", "Trợ lý chưa tạo được câu trả lời hợp lệ. Vui lòng thử lại.", 502); }
-    if (typeof result.supported !== "boolean" || typeof result.answer !== "string" || result.answer.length > 12000 || !Array.isArray(result.sourceIds)) {
-      throw new AiError("AI_INVALID_ANSWER", "Trợ lý chưa tạo được câu trả lời hợp lệ. Vui lòng thử lại.", 502);
-    }
-    return { ...result, usage: body.usageMetadata || {} };
+    return { data: result, usage: body.usageMetadata || {} };
   } catch (error) { throw providerError(error); }
 }
 
-module.exports = { embedDocuments: texts => embedTexts(texts, "RETRIEVAL_DOCUMENT"), embedQuery, generateText, providerError };
+async function generateText({ system, question, context }, options) {
+  const { data: result, usage } = await generateStructured({ system,
+    input: { question, referencePassages: context },
+    schema: {
+      type: "OBJECT", properties: { supported: { type: "BOOLEAN" }, answer: { type: "STRING" },
+        sourceIds: { type: "ARRAY", items: { type: "STRING", enum: context.map(passage => passage.sourceId) } },
+      }, required: ["supported", "answer", "sourceIds"],
+    },
+  }, options);
+  if (!result || typeof result.supported !== "boolean" || typeof result.answer !== "string" || result.answer.length > 12000 || !Array.isArray(result.sourceIds)) {
+    throw new AiError("AI_INVALID_ANSWER", "Trợ lý chưa tạo được câu trả lời hợp lệ. Vui lòng thử lại.", 502);
+  }
+  return { ...result, usage };
+}
+
+module.exports = { embedDocuments: texts => embedTexts(texts, "RETRIEVAL_DOCUMENT"), embedQuery, generateText, generateStructured, providerError };

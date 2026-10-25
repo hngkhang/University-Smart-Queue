@@ -4,19 +4,25 @@ import { Link, useLocation } from "react-router";
 import { readSession } from "../../../services/session";
 import { useAssistant } from "../hooks/useAssistant";
 import SourceCard from "./SourceCard";
+import { useBookingDraft } from "../hooks/useBookingDraft";
+import BookingDraftCard from "./BookingDraftCard";
 
 const suggestions = ["Xin bảng điểm thì chọn phòng nào?", "Tôi có thể chọn nhiều dịch vụ không?", "Quy định đặt và hủy lịch là gì?"];
 
-export default function AssistantPanel({ onClose, onDock, assistant }: {
+export default function AssistantPanel({ onClose, onDock, assistant, booking, mode, setMode }: {
   onClose: () => void;
   onDock: (side: "left" | "right") => void;
   assistant: ReturnType<typeof useAssistant>;
+  booking: ReturnType<typeof useBookingDraft>;
+  mode: "chat" | "booking";
+  setMode: (mode: "chat" | "booking") => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const location = useLocation();
   const signedIn = Boolean(readSession());
+  const isStudent = readSession()?.user.role === "student";
   const { status, messages, error, sending, send, refresh, draft, setDraft } = assistant;
   const canSend = signedIn && status?.canChat && !sending;
 
@@ -57,6 +63,11 @@ export default function AssistantPanel({ onClose, onDock, assistant }: {
         <div className="sq-ai-heading"><span>SMARTQUEUE ASSISTANT</span><h2 id="sq-ai-title">Trợ lý thủ tục</h2></div>
         <button type="button" className="sq-ai-icon" aria-label="Đóng trợ lý" onClick={onClose} autoFocus><X size={20} /></button>
       </header>
+      <div className="sq-ai-modes" role="group" aria-label="Chế độ trợ lý">
+        <button type="button" aria-pressed={mode === "chat"} onClick={() => setMode("chat")}>Hỏi đáp thủ tục</button>
+        <button type="button" aria-pressed={mode === "booking"} onClick={() => setMode("booking")}>Hỗ trợ đặt lịch</button>
+      </div>
+      {mode === "chat" ? <>
       <div className="sq-ai-subheader" role="status"><BookOpen size={14} aria-hidden="true" />
         {status?.canChat ? "Sẵn sàng · Trả lời kèm nguồn tham khảo" : error ? "Tạm thời chưa thể kết nối với trợ lý" : status ? "Trợ lý chưa sẵn sàng · Xem thông báo bên dưới" : "Đang kiểm tra kết nối…"}
       </div>
@@ -93,6 +104,34 @@ export default function AssistantPanel({ onClose, onDock, assistant }: {
         </div>
         <p id="sq-ai-input-help">{!signedIn ? "Đăng nhập để gửi câu hỏi cho trợ lý." : status?.canChat ? "Kiểm tra nguồn tham khảo trước khi thực hiện thủ tục." : "Bạn có thể soạn câu hỏi. Gửi tin nhắn sẽ mở khi trợ lý sẵn sàng."}</p>
       </form>
+      </> : <>
+        <div className="sq-ai-subheader" role="status">Điền thông tin bằng AI · Bạn kiểm tra và xác nhận</div>
+        <div className="sq-ai-content">
+          {!booking.result && <div className="sq-ai-welcome">
+            <h3>Bạn muốn đặt lịch làm gì?</h3>
+            <p>Nêu dịch vụ, ngày và giờ mong muốn. Mỗi yêu cầu tạo một bản nháp cho một phòng.</p>
+            {!booking.result && <div className="sq-ai-suggestions"><button type="button" disabled={booking.sending} onClick={() => booking.setText("Tôi muốn xin bảng điểm vào sáng mai, khoảng 9 giờ.")}>Tôi muốn xin bảng điểm vào sáng mai <ArrowUpRight size={16} aria-hidden="true" /></button></div>}
+          </div>}
+          {booking.sending && <p className="sq-ai-progress" role="status">Đang phân tích nhu cầu đặt lịch…</p>}
+          {booking.result && <BookingDraftCard result={booking.result} onClose={onClose} />}
+          {booking.error && <p className="sq-ai-notice" role="alert">{booking.error}</p>}
+          {!booking.result && <div className="sq-ai-notice" role="status">
+            {!isStudent ? "Cần tài khoản sinh viên để sử dụng hỗ trợ đặt lịch." : booking.status?.message || "Đang kiểm tra kết nối…"}
+            {(!booking.status || !booking.status.canDraft) && <button type="button" onClick={booking.refresh}><RotateCcw size={14} aria-hidden="true" /> Kiểm tra lại</button>}
+          </div>}
+          {booking.result && <button type="button" className="sq-ai-edit-request" onClick={() => booking.setText(booking.text)}>Sửa nhu cầu đặt lịch</button>}
+          <Link className="sq-ai-signin" to="/appointments/new" onClick={onClose}>Mở form đặt lịch thủ công <ArrowUpRight size={14} aria-hidden="true" /></Link>
+          {!signedIn && <Link className="sq-ai-signin" to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} onClick={onClose}>Đăng nhập để sử dụng trợ lý</Link>}
+        </div>
+        {!booking.result && <form className="sq-ai-composer" onSubmit={event => { event.preventDefault(); if (isStudent) void booking.send(); }}>
+          <label htmlFor="sq-ai-booking-input">Nhu cầu đặt lịch</label>
+          <div className="sq-ai-input-wrap">
+            <textarea id="sq-ai-booking-input" value={booking.text} onChange={event => booking.setText(event.target.value)} maxLength={2000} rows={2} placeholder="Ví dụ: Xin bảng điểm vào sáng mai lúc 9 giờ…" disabled={booking.sending} aria-describedby="sq-ai-booking-help" />
+            <button type="submit" aria-label="Phân tích nhu cầu đặt lịch" disabled={!isStudent || !booking.status?.canDraft || booking.sending || !booking.text.trim()}><Send size={18} aria-hidden="true" /></button>
+          </div>
+          <p id="sq-ai-booking-help">Chỉ tạo bản nháp. Lịch hẹn được lưu sau khi bạn xác nhận trong form.</p>
+        </form>}
+      </>}
       <footer className="sq-ai-footer"><span>Vị trí nút trợ lý</span><div>
         <button type="button" onClick={() => onDock("left")} aria-label="Đặt nút trợ lý ở góc dưới bên trái"><ArrowDownLeft size={14} aria-hidden="true" /> Trái</button>
         <button type="button" onClick={() => onDock("right")} aria-label="Đặt nút trợ lý ở góc dưới bên phải"><ArrowDownRight size={14} aria-hidden="true" /> Phải</button>
