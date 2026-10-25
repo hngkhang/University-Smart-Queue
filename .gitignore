@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.vercel/
 .env
 .env.*
 !.env.example
@@ -7,3 +8,60 @@ dist/
 QUEUE_BOOKING_UI_REVIEW.md
 ADMIN_WORKSPACE.md
 backend/manual-data/backups/
+
+# AI runtime data, uploads, raw logs and local credentials
+/.local/
+/secrets/
+backend/data/
+backend/uploads/
+backend/ai/evaluation-runs/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local Python runtimes and generated caches (including Chroma tooling)
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+coverage/
+.coverage
+htmlcov/
+
+# Local vector/database stores, dumps and temporary backups
+.chroma/
+chroma_db/
+chroma-data/
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.sqlite3-*
+*.db
+*.db-*
+*.dump
+*.bak
+*.tmp
+
+# Credential exports and local tool authentication
+.envrc
+.netrc
+_netrc
+.git-credentials
+.npmrc
+.pypirc
+credentials.json
+token.json
+service-account*.json
+service_account*.json
+*-firebase-adminsdk-*.json
+*.p8
+*.jks
+
+# OS metadata
+.DS_Store
+Thumbs.db

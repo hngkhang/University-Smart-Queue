@@ -193,6 +193,70 @@ must resolve active tickets/upcoming appointments before changing roles.
 
 ## Verification
 
+### AI knowledge ingestion (local Chroma, no Docker)
+
+From `backend/`, run `npm run ai:ingest -- --dry-run` to validate and split
+`data/raw/KB-SmartQueue-Student-Service-Guide.vi.md` without calling Gemini or Chroma.
+Then, with Chroma listening on the configured host/port, run `npm run ai:ingest`.
+Neither the Express server, MongoDB nor the frontend needs to run for ingestion.
+
+The command reads `backend/.env` directly: `GEMINI_API_KEY`,
+`AI_EMBEDDING_MODEL=gemini-embedding-001`, `CHROMA_HOST`, `CHROMA_PORT`,
+`CHROMA_SSL`, `CHROMA_COLLECTION`, and the character chunk/overlap settings.
+It sends document text to Gemini in groups of at most 20, uses
+`RETRIEVAL_DOCUMENT` with 3072 dimensions, and stores vectors, text, section,
+source filename, document ID and version in a cosine Chroma collection.
+Raw data and the local Chroma directory remain ignored by Git.
+
+Unchanged content/configuration is skipped without calling Gemini again.
+For an update, all embeddings are prepared before writing; old chunks for that
+document alone are removed after the new chunks are verified. If interrupted
+between saving and cleanup, rerunning completes cleanup. This is not an atomic
+publication mechanism for concurrent writers across multiple hosts. Chat pauses
+while the local lock exists and rejects mixed revisions or an index changed during retrieval. Runs from this
+checkout are serialized with `data/.ai-ingest.lock`. After a forced interruption,
+remove that lock only after confirming the previous process has stopped.
+
+Use `npm run ai:ingest -- --file data/raw/another-guide.md` for another public
+knowledge file with the same `- Mã tài liệu:` and `- Phiên bản:` metadata format.
+Use a distinct document ID for each document. A different embedding model needs
+a compatible implementation and a separate collection, not mixed vectors.
+Embedding queries must use the same model/dimensions and `RETRIEVAL_QUERY`.
+
+`npm run test:ai-ingest` checks failure preservation, idempotence, version cleanup
+and provider validation without sending documents to Gemini.
+
+### Application tests
+
+`npm run test:ai` runs ingestion/provider/retrieval unit checks and authenticated
+route checks. Route tests use their own temporary `smartqueue_test_ai_*` MongoDB
+database; Gemini is mocked for automated tests.
+
+### AI chat
+
+Run Chroma, the backend and the frontend, then sign in with an active account.
+`GET /api/ai/status` checks key presence and a compatible, nonempty public index.
+It does not call Gemini or certify quota/model access; errors from the provider
+are surfaced when a question is sent. Reopen the widget or use its refresh button
+after correcting configuration. The default chat model is `gemini-3.5-flash-lite`.
+
+`POST /api/ai/chat` requires a valid JWT and accepts `{ "message": "..." }`.
+Queries use `RETRIEVAL_QUERY` with the same 3072-dimensional model as ingestion.
+Only public indexed documents are searched. Cosine-distance filtering defaults to
+`RAG_MAX_DISTANCE=0.6`; this is a tunable retrieval cutoff, not a confidence score.
+Top matching sections are expanded from their overlapping chunks to preserve
+headings and context. Answers include validated numeric citations and readable
+excerpts. Missing evidence or invalid citations produce an explicit unknown response.
+This validates citation IDs, not semantic entailment; a formal evaluation remains necessary.
+
+Chat is single-turn: prior bubbles are displayed locally but not sent to the model.
+It does not read personal appointments, book/cancel anything or infer live queue status.
+The process limits each account to one in-flight request and 10 requests per minute;
+distributed deployments need a shared limiter. Timeouts/quota/network errors are
+localized. Logs include request ID, model, prompt version, latency and generation
+token usage without question text or credentials. Cost estimation, embedding usage
+accounting and the full assignment evaluation report are not implemented yet.
+
 `npm test` runs integration tests against MongoDB using a unique, temporary
 `smartqueue_test_*` database and drops only that database on completion.
 It uses `TEST_MONGODB_URI`, then `MONGODB_URI`, then local MongoDB. The test
