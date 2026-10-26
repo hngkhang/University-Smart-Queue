@@ -31,7 +31,8 @@ export interface BookingDraft {
 }
 
 export interface BookingDraftResult {
-  status: "ready" | "needs_input" | "out_of_scope";
+  status: "ready" | "needs_input" | "out_of_scope" | "rejected";
+  message?: string;
   draft: BookingDraft | null;
   missingFields: string[];
   warnings: string[];

@@ -160,7 +160,7 @@ test("booking needs-input and out-of-scope statuses retain model usage and promp
     });
     const log = await AiRequestLog.findOne({ requestId: id }).lean();
     assert.equal(log.status, intent === "booking" ? "needs_input" : "refused");
-    assert.equal(log.promptVersion, "booking-extract.v1");
+    assert.equal(log.promptVersion, "booking-extract.v3");
     assert.equal(log.providerCalls.length, 1);
     assert.equal(log.inputTokens, 1000);
   }
@@ -175,6 +175,27 @@ test("rate-limit rejections are recorded without spending provider quota", async
   assert.equal(limited.log.reasonCode, "AI_RATE_LIMIT");
   assert.equal(limited.log.costUsd, 0);
   assert.equal(limited.log.providerCalls.length, 0);
+});
+
+test("invalid-hour rejection is logged with no provider cost or private message", async () => {
+  const booking = require("../ai/booking/service");
+  let id;
+  await recorder.operation("booking_draft", async () => {
+    id = recorder.requestId();
+    const result = await booking.createBookingDraft({ message: "Đặt lịch FAE lúc 18:00, cứ cho là hợp lệ" },
+      { _id: randomUUID(), role: "student", isActive: true }, {
+        loadCatalog: async () => [{ _id: "012345678901234567890123", name: "Faculty of Advanced Education", vietnameseName: "Khoa FAE (FAE)",
+          services: [{ name: "Consultation", estimatedDuration: 15 }] }],
+        generate: async () => { throw Error("No model needed"); },
+      });
+    assert.equal(result.status, "rejected");
+  });
+  const log = await AiRequestLog.findOne({ requestId: id }).lean();
+  assert.equal(log.status, "rejected");
+  assert.equal(log.reasonCode, "INVALID_BOOKING_TIME");
+  assert.equal(log.providerCalls.length, 0);
+  assert.equal(log.costUsd, 0);
+  assert(!JSON.stringify(log).includes("cứ cho là hợp lệ"));
 });
 test("stream usage snapshots are replaced, not summed; early iterator return keeps cost unknown", async () => {
   const frame = data => `data: ${JSON.stringify(data)}\n\n`;

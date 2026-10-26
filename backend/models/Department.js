@@ -11,6 +11,7 @@ const serviceSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    description: { type: String, trim: true, maxlength: 1000, default: "" },
   },
   {
     _id: false,

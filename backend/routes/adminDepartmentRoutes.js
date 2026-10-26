@@ -37,9 +37,10 @@ function parseDepartment(body) {
       new Set(body.bookingExcludedDates).size !== body.bookingExcludedDates.length) return null;
   const services = body.services.map((service) => ({
     name: textField(service?.name, 120, true),
+    description: textField(service?.description === undefined ? "" : service.description, 1000),
     estimatedDuration: service?.estimatedDuration,
   }));
-  if (services.some((service) => !service.name || !Number.isInteger(service.estimatedDuration) ||
+  if (services.some((service) => !service.name || service.description === null || !Number.isInteger(service.estimatedDuration) ||
       service.estimatedDuration < 1 || service.estimatedDuration > 1440) ||
       new Set(services.map((service) => service.name.toLocaleLowerCase())).size !== services.length) return null;
   return {
@@ -62,7 +63,7 @@ function present(department) {
     bookingEnabled: department.bookingEnabled !== false,
     bookingWeekdays: department.bookingWeekdays ?? [1, 2, 3, 4, 5],
     bookingExcludedDates: department.bookingExcludedDates ?? [],
-    services: (department.services || []).map(({ name, estimatedDuration }) => ({ name, estimatedDuration })),
+    services: (department.services || []).map(({ name, estimatedDuration, description = "" }) => ({ name, estimatedDuration, description })),
   };
 }
 

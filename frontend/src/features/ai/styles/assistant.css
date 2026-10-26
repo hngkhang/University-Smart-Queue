@@ -8,9 +8,9 @@
   padding: 0;
   border: 1px solid #ffffff4d;
   border-radius: 50%;
-  background: linear-gradient(145deg, #5079a7, #24466d);
+  background: #345d87;
   color: white;
-  box-shadow: 0 6px 22px #17395b38, inset 0 1px 0 #ffffff26;
+  box-shadow: 0 6px 20px #17395b2b;
   cursor: grab;
   touch-action: none;
   user-select: none;
@@ -40,7 +40,7 @@
 .sq-ai-panel {
   position: fixed;
   inset: auto 20px 88px auto;
-  width: min(400px, calc(100vw - 32px));
+  width: min(420px, calc(100vw - 32px));
   height: min(630px, calc(100dvh - 112px));
   max-width: none;
   max-height: none;
@@ -48,71 +48,65 @@
   padding: 0;
   overflow: hidden;
   border: 1px solid #dbe4ef;
-  border-radius: 22px;
+  border-radius: 16px;
   background: #fff;
   color: #243b53;
   box-shadow: 0 20px 70px #142f4d30;
 }
 .sq-ai-panel::backdrop { background: #132c451c; }
-.sq-ai-shell { display: flex; flex-direction: column; height: 100%; font-size: 14px; line-height: 1.5; }
+.sq-ai-shell { display: flex; flex-direction: column; height: 100%; font-size: 14px; line-height: 1.6; }
 .sq-ai-shell button, .sq-ai-shell a { -webkit-tap-highlight-color: transparent; }
-.sq-ai-header { display: flex; align-items: center; gap: 12px; padding: 18px 18px 16px; background: #f7f9fc; }
-.sq-ai-modes { display: flex; gap: 8px; padding: 8px 16px; flex-shrink: 0; }
-.sq-ai-modes button { flex: 1; min-height: 44px; border-radius: 10px; border: 1px solid #dce5ef; background: white; color: #45627e; cursor: pointer; font-size: 12px; font-weight: 600; }
-.sq-ai-modes button[aria-pressed="true"] { background: #eaf0f8; border-color: #809dbd; color: #24466d; }
-.sq-ai-booking-card { margin-top: 16px; padding: 16px; border: 1px solid #dce5ef; border-radius: 14px; background: #f7f9fc; overflow-wrap: anywhere; }
+.sq-ai-header { display: flex; align-items: center; gap: 12px; padding: 10px 12px 4px 20px; flex-shrink: 0; }
+.sq-ai-modes { display: flex; gap: 4px; margin: 4px 16px 0; padding: 4px; border-radius: 10px; background: #f1f4f8; flex-shrink: 0; }
+.sq-ai-modes button { flex: 1; min-height: 44px; border-radius: 7px; border: none; background: transparent; color: #52677e; cursor: pointer; font-size: 13px; font-weight: 600; }
+.sq-ai-modes button[aria-pressed="true"] { background: white; color: #24466d; box-shadow: 0 1px 4px #19375412; }
+.sq-ai-booking-card { padding: 16px; border: 1px solid #dce5ef; border-radius: 12px; background: #fff; overflow-wrap: anywhere; }
 .sq-ai-booking-card h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; font-size: 15px; font-weight: 650; }
 .sq-ai-booking-card dl { display: grid; grid-template-columns: 65px minmax(0, 1fr); gap: 10px; margin: 0; font-size: 13px; }
 .sq-ai-booking-card dt { color: #526c87; }
 .sq-ai-booking-card dd { margin: 0; font-weight: 600; white-space: pre-wrap; }
-.sq-ai-booking-card p { font-size: 12px; line-height: 1.7; color: #526c87; margin: 14px 0 0; }
+.sq-ai-booking-card p { font-size: 13px; line-height: 1.7; color: #526c87; margin: 12px 0 0; }
+.sq-ai-booking-card .sq-ai-clarification { font-size: 14px; color: #243b53; }
 .sq-ai-booking-continue { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 44px; margin-top: 16px; padding: 10px; border: none; border-radius: 10px; background: #3f6392; color: white; font-weight: 600; cursor: pointer; }
 .sq-ai-edit-request { display: block; min-height: 44px; margin-top: 8px; padding: 8px 0; border: none; background: transparent; color: #3f6392; font-weight: 600; font-size: 12px; cursor: pointer; }
-.sq-ai-avatar { display: grid; place-items: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: 14px; background: #e7eef7; color: #3f6392; }
 .sq-ai-heading { flex: 1; min-width: 0; }
-.sq-ai-heading > span { font-size: 9px; font-weight: 700; letter-spacing: 1.5px; color: #687d96; }
-.sq-ai-heading h2 { margin: 2px 0 0; font-size: 18px; line-height: 1.4; font-weight: 650; color: #193754; }
+.sq-ai-heading h2 { margin: 0; font-size: 16px; line-height: 1.4; font-weight: 650; color: #193754; }
 .sq-ai-icon { display: grid; place-items: center; width: 44px; height: 44px; border: none; border-radius: 12px; cursor: pointer; color: #65768c; background: transparent; }
 .sq-ai-icon:hover { background: #e8edf4; }
-.sq-ai-subheader { display: flex; align-items: center; gap: 7px; padding: 10px 20px; border-top: 1px solid #e8edf4; border-bottom: 1px solid #e8edf4; font-size: 11px; color: #5a7089; }
-.sq-ai-content { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 22px 20px 16px; }
-.sq-ai-welcome-icon { display: grid; place-items: center; width: 54px; height: 54px; margin-bottom: 16px; border: 1px solid #e1e9f3; border-radius: 18px; background: #f5f8fc; color: #52779e; }
+.sq-ai-content { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 24px 20px 16px; scrollbar-width: thin; }
+.sq-ai-welcome { padding-top: 12px; }
 .sq-ai-welcome h3 { margin: 0 0 8px; font-size: 19px; line-height: 1.4; font-weight: 650; letter-spacing: -0.35px; }
 .sq-ai-welcome > p { margin: 0; color: #697b90; font-size: 13px; line-height: 1.7; }
 .sq-ai-suggestions { display: grid; gap: 8px; margin: 20px 0; }
-.sq-ai-suggestions button { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 44px; padding: 10px 12px; border: 1px solid #e3e9f0; border-radius: 11px; background: white; text-align: left; font-size: 12px; color: #45627e; cursor: pointer; }
+.sq-ai-suggestions button { min-height: 44px; padding: 10px 12px; border: 1px solid #e3e9f0; border-radius: 8px; background: white; text-align: left; font-size: 13px; color: #45627e; cursor: pointer; }
 .sq-ai-suggestions button:hover { background: #f5f8fc; border-color: #bccfe3; }
-.sq-ai-suggestions svg { flex-shrink: 0; }
 .sq-ai-notice { margin-top: 14px; padding: 12px; border: 1px solid #e3e9f0; border-radius: 11px; background: #f8fafc; font-size: 12px; line-height: 1.65; color: #5f7085; }
 .sq-ai-notice:empty { display: none; }
 .sq-ai-notice p { margin: 0; }
 .sq-ai-notice button { display: flex; align-items: center; gap: 6px; min-height: 36px; margin-top: 4px; padding: 0 4px; border: none; background: transparent; font-size: 12px; color: #355c86; font-weight: 600; cursor: pointer; }
 .sq-ai-signin { display: flex; align-items: center; gap: 5px; min-height: 44px; margin-top: 6px; font-size: 12px; font-weight: 600; color: #3f6392; text-decoration: none; }
-.sq-ai-messages { display: grid; gap: 12px; }
-.sq-ai-message { padding: 12px 14px; border-radius: 14px; background: #f1f5f9; overflow-wrap: anywhere; }
-.sq-ai-message-user { margin-left: 22px; background: #eaf0f8; }
+.sq-ai-messages { display: grid; gap: 20px; }
+.sq-ai-message { padding: 0; overflow-wrap: anywhere; min-width: 0; }
+.sq-ai-message-user { justify-self: end; max-width: 90%; padding: 10px 14px; border-radius: 12px 12px 3px 12px; background: #edf2f8; }
 .sq-ai-sender { font-size: 11px; font-weight: 700; color: #526c87; }
 .sq-ai-message p { white-space: pre-wrap; margin: 5px 0 0; }
+.sq-ai-sources { margin-top: 10px; border-top: 1px solid #e8edf4; font-size: 12px; color: #526c87; }
+.sq-ai-sources > summary { min-height: 44px; padding: 11px 0; cursor: pointer; }
+.sq-ai-sources > summary:focus-visible { outline: 3px solid #6c9bd0; outline-offset: 2px; }
 .sq-ai-source { margin-top: 10px; color: #3f5c7a; font-size: 12px; }
-.sq-ai-source summary { display: flex; align-items: flex-start; gap: 6px; min-height: 44px; padding: 6px 0; cursor: pointer; border-radius: 4px; }
+.sq-ai-source summary { min-height: 44px; padding: 10px 0; cursor: pointer; border-radius: 4px; }
 .sq-ai-source summary:focus-visible { outline: 3px solid #6c9bd0; outline-offset: 2px; }
-.sq-ai-source small { display: block; margin-top: 2px; font-size: 11px; text-decoration: underline; }
+.sq-ai-source small { display: block; margin-top: 2px; font-size: 12px; }
 .sq-ai-source p { padding: 10px; border-left: 2px solid #9bb3cd; background: #fff; font-size: 12px; line-height: 1.7; }
-.sq-ai-source svg { flex-shrink: 0; margin-top: 2px; }
 .sq-ai-progress { color: #62798f; font-size: 12px; }
-.sq-ai-composer { flex-shrink: 0; padding: 13px 16px 9px; border-top: 1px solid #e8edf4; background: white; }
-.sq-ai-composer label { display: block; margin-bottom: 6px; font-size: 11px; font-weight: 600; color: #62778d; }
+.sq-ai-composer { flex-shrink: 0; padding: 12px 16px 16px; border-top: 1px solid #e8edf4; background: white; }
+.sq-ai-composer label { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 500; color: #52677e; }
 .sq-ai-input-wrap { display: flex; gap: 8px; align-items: flex-end; padding: 8px; border: 1px solid #dce5ef; border-radius: 13px; background: #f9fbfd; }
 .sq-ai-input-wrap:focus-within { border-color: #7092ba; box-shadow: 0 0 0 3px #4a78ae0d; }
-.sq-ai-input-wrap textarea { flex: 1; min-width: 0; min-height: 46px; max-height: 100px; padding: 3px 4px; border: none; background: transparent; resize: none; font: inherit; font-size: 13px; outline: none; color: #243b53; }
+.sq-ai-input-wrap textarea { flex: 1; min-width: 0; min-height: 46px; max-height: 100px; padding: 3px 4px; border: none; background: transparent; resize: none; font: inherit; font-size: 14px; outline: none; color: #243b53; }
 .sq-ai-input-wrap textarea::placeholder { color: #7f8da0; }
 .sq-ai-input-wrap button { display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; border: none; border-radius: 10px; background: #3f6392; color: white; cursor: pointer; }
 .sq-ai-input-wrap button:disabled { background: #e5ebf2; color: #8494a7; cursor: not-allowed; }
-.sq-ai-composer > p { margin: 7px 0 0; font-size: 10px; line-height: 1.5; color: #718297; }
-.sq-ai-footer { display: flex; justify-content: space-between; align-items: center; padding: 0 16px 10px; color: #6e8095; font-size: 10px; }
-.sq-ai-footer > div { display: flex; gap: 4px; }
-.sq-ai-footer button { display: flex; align-items: center; gap: 4px; min-height: 36px; padding: 0 8px; background: transparent; border: none; border-radius: 8px; font-size: 11px; color: #526e8b; cursor: pointer; }
-.sq-ai-footer button:hover { background: #f1f5f9; }
 @media (max-width: 480px) {
   .sq-ai-panel { inset: auto 12px max(12px, env(safe-area-inset-bottom)) 12px; width: auto; height: min(650px, calc(100dvh - 32px)); border-radius: 20px; }
   .sq-ai-content { padding: 18px 16px 12px; }

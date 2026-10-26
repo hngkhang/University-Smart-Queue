@@ -93,3 +93,17 @@ test("future appointments prevent department deletion", async () => {
   assert.equal((await request(`/admin/departments/${id}`, adminToken, "PUT", { ...payload, name: "Scheduled Office", isActive: false })).status, 409);
   assert.equal((await Department.findById(id).lean()).isArchived, false);
 });
+
+test("service descriptions survive editing and reject malformed values", async () => {
+  const services = [{ ...payload.services[0], description: "  Tư vấn học vụ, không sửa thông tin hóa đơn.  " }];
+  const created = await request("/admin/departments", adminToken, "POST", { ...payload, name: "Described Office", services });
+  assert.equal(created.status, 201);
+  assert.equal(created.data.department.services[0].description, services[0].description.trim());
+  const id = created.data.department.id;
+  const updated = await request(`/admin/departments/${id}`, adminToken, "PUT", { ...payload, name: "Described Office", services: created.data.department.services });
+  assert.equal(updated.status, 200);
+  assert.equal((await Department.findById(id).lean()).services[0].description, services[0].description.trim());
+  for (const description of [null, 123, "x".repeat(1001)]) {
+    assert.equal((await request(`/admin/departments/${id}`, adminToken, "PUT", { ...payload, services: [{ ...payload.services[0], description }] })).status, 400);
+  }
+});

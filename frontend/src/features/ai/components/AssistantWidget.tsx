@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from "react";
-import { Sparkles } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import { readSession, SESSION_CHANGED_EVENT } from "../../../services/session";
 import { useFloatingPosition } from "../hooks/useFloatingPosition";
 import { useAssistant } from "../hooks/useAssistant";
@@ -29,10 +29,10 @@ function Widget() {
       aria-label="Mở trợ lý thủ tục" aria-haspopup="dialog" aria-expanded={open}
       title="Trợ lý thủ tục · Kéo để di chuyển, hoặc dùng phím mũi tên"
       onClick={() => { if (!floating.consumeDragClick()) setOpen(true); }}>
-      <Sparkles size={25} strokeWidth={1.65} aria-hidden="true" />
+      <MessageCircle size={25} strokeWidth={1.65} aria-hidden="true" />
       <span className="sq-ai-launcher-label" aria-hidden="true">Trợ lý thủ tục</span>
     </button>
-    {open && <AssistantPanel assistant={assistant} booking={booking} mode={mode} setMode={setMode} onClose={() => setOpen(false)} onDock={floating.dock} />}
+    {open && <AssistantPanel assistant={assistant} booking={booking} mode={mode} setMode={setMode} onClose={() => setOpen(false)} />}
   </>;
 }
 

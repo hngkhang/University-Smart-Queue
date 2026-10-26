@@ -39,10 +39,14 @@ export async function createBookingDraft(message: string, signal: AbortSignal): 
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.token}` },
     body: JSON.stringify({ message }),
   });
-  if (!["ready", "needs_input", "out_of_scope"].includes(data.status) ||
+  const noDraft = data.status === "out_of_scope" || data.status === "rejected";
+  if (!["ready", "needs_input", "out_of_scope", "rejected"].includes(data.status) ||
+      (data.message !== undefined && typeof data.message !== "string") ||
+      (data.status === "rejected" && (typeof data.message !== "string" || !data.message.trim())) ||
       !Array.isArray(data.warnings) || !data.warnings.every((value: unknown) => typeof value === "string") ||
       !Array.isArray(data.missingFields) || typeof data.requestId !== "string" ||
-      (data.status !== "out_of_scope" && (!data.draft || !Array.isArray(data.draft.services) ||
+      (noDraft && data.draft !== null) ||
+      (!noDraft && (!data.draft || !Array.isArray(data.draft.services) ||
         !data.draft.services.every((value: unknown) => typeof value === "string") || typeof data.draft.notes !== "string"))) {
     throw new Error("Chưa nhận được bản nháp hợp lệ. Bạn có thể mở form đặt lịch.");
   }

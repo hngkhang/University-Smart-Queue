@@ -4,7 +4,7 @@ import { Building2, Pencil, Plus, RefreshCw, Search, Trash2 } from "lucide-react
 import AppDialog from "../components/AppDialog";
 import { adminApi } from "../services/admin";
 
-type Service = { name: string; estimatedDuration: number };
+type Service = { name: string; estimatedDuration: number; description?: string };
 type Department = {
   id: string;
   name: string;
@@ -87,6 +87,7 @@ function DepartmentForm({ department, onClose, onSaved }: {
             <input aria-label={`Service ${index + 1} duration in minutes`} type="number" required min={1} max={1440} value={service.estimatedDuration} onChange={(e) => set("services", form.services.map((item, i) => i === index ? { ...item, estimatedDuration: Number(e.target.value) } : item))} />
             <span>min</span>
             <button type="button" aria-label={`Remove service ${index + 1}`} onClick={() => set("services", form.services.filter((_, i) => i !== index))}><Trash2 size={17} /></button>
+            <textarea style={{ gridColumn: "1 / -1" }} aria-label={`Service ${index + 1} description`} maxLength={1000} rows={2} placeholder="Describe the service and how it differs from similar services (optional)" value={service.description || ""} onChange={(e) => set("services", form.services.map((item, i) => i === index ? { ...item, description: e.target.value } : item))} />
           </div>
         ))}
         {error && <p className="sq-notice sq-error" role="alert">{error}</p>}

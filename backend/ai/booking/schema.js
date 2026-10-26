@@ -2,8 +2,8 @@ const { z } = require("zod");
 
 const bookingSchema = z.strictObject({
   intent: z.enum(["booking", "out_of_scope"]),
-  departmentId: z.string().max(24).nullable(),
-  services: z.array(z.string().min(1).max(200)).max(50),
+  departmentId: z.string().regex(/^[a-fA-F0-9]{24}$/).nullable(),
+  services: z.array(z.string().min(1).max(200).regex(/\S/)).max(50),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   timePreference: z.strictObject({
     period: z.enum(["any", "morning", "afternoon", "evening"]),
