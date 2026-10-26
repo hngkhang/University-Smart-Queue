@@ -1,5 +1,5 @@
 // Adapted from loaders.py: supports ordinary Markdown headings, not clinic sections.
-// Input is text supplied by a future authenticated ingestion service, never a URL.
+// Input is text supplied by the CLI or authenticated admin upload, never a URL.
 function loadMarkdownSections(markdown) {
   if (typeof markdown !== "string") throw new TypeError("Markdown must be text.");
   const lines = markdown.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n");

@@ -12,6 +12,7 @@ router.use((_req, res, next) => {
 });
 router.use("/departments", require("./adminDepartmentRoutes"));
 router.use("/users", require("./adminUserRoutes"));
+router.use("/knowledge", require("./adminKnowledgeRoutes"));
 const roles = { role: { $in: ["student", "staff"] } };
 const search = (value) => {
   const term = typeof value === "string" ? value.trim().slice(0, 100) : "";

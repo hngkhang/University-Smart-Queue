@@ -23,10 +23,10 @@ function prepareIndex({ markdown, sourceFile }) {
 }
 
 // All Gemini calls finish before replacing data. A failed embed preserves the old document.
-// CLI serializes runs with a local lock; do not run concurrent writers from other machines.
+// CLI and admin uploads share a local lock; do not run writers from other machines.
 async function indexDocument({ prepared, collection, embedDocuments, log = () => {} }) {
   if (collection.metadata?.embeddingModel !== prepared.model || collection.metadata?.embeddingDimensions !== DIMENSIONS) {
-    throw new Error("Collection embedding model/dimensions differ. Choose a new CHROMA_COLLECTION; existing data was not changed.");
+    throw Object.assign(new Error("Collection embedding model/dimensions differ. Choose a new CHROMA_COLLECTION; existing data was not changed."), { code: "AI_INDEX_MISMATCH" });
   }
   const previous = await collection.get({ where: { documentId: prepared.documentId }, include: ["metadatas"] });
   const wanted = new Set(prepared.chunks.map(chunk => chunk.id));

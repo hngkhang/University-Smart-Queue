@@ -242,6 +242,16 @@ from `backend/` to verify the streaming protocol without MongoDB or an AI key.
 
 ### AI knowledge ingestion (local Chroma, no Docker)
 
+Chroma must be running in addition to MongoDB and the backend. With this project's
+local Chroma environment installed, start it from the repository root in PowerShell:
+
+```powershell
+& .\.local\chroma-venv\Scripts\chroma.exe run --path .\backend\data\chroma --host 127.0.0.1 --port 8000
+```
+
+Keep that process running while using the chatbot or uploading knowledge. Reuse
+the same persistence path so the existing knowledge collection is loaded.
+
 From `backend/`, run `npm run ai:ingest -- --dry-run` to validate and split
 `data/raw/KB-SmartQueue-Student-Service-Guide.vi.md` without calling Gemini or Chroma.
 Then, with Chroma listening on the configured host/port, run `npm run ai:ingest`.
@@ -272,6 +282,44 @@ Embedding queries must use the same model/dimensions and `RETRIEVAL_QUERY`.
 
 `npm run test:ai-ingest` checks failure preservation, idempotence, version cleanup
 and provider validation without sending documents to Gemini.
+
+### Admin Markdown replacement
+
+Open **Admin → Tài liệu AI** (`/admin/knowledge`) to select a UTF-8 `.md` file
+of at most 2 MiB. Both the browser and backend validate the upload. The selected
+filename can differ: the saved filename is always
+`data/raw/KB-SmartQueue-Student-Service-Guide.vi.md`.
+
+Keep the current `- Mã tài liệu:` value and include `- Phiên bản:` in the new
+document. The screen displays the expected ID and current version. If the source
+file does not yet exist, use `SQ-KB-STUDENT-GUIDE`. This upload replaces the whole
+document; it does not append to it. Only public student-facing content belongs in
+this knowledge source. The resulting public collection must fit the existing
+1,000-chunk limit.
+
+The authenticated admin endpoint is `PUT /api/admin/knowledge`, with the file
+bytes as `application/octet-stream` and the URI-encoded original filename in
+`X-File-Name`. `GET /api/admin/knowledge` returns source metadata, the size limit,
+the current operation state and whether ingestion is locked. Normal users and
+staff cannot use either endpoint. Uploads require the same Gemini and Chroma
+configuration as the CLI; they can take several minutes. If deploying behind a
+proxy, allow a sufficiently long request timeout. Closing the page does not cancel
+an accepted upload; reopen the page to check its status before retrying. Operation
+messages live for the server process lifetime; file metadata persists on disk.
+
+The upload stages the file, creates/verifies the new index and replaces the source
+file only after indexing succeeds. A shared `.ai-ingest.lock` prevents overlapping
+CLI/admin updates and pauses chat while publishing. On a handled failure after a
+database write, the service restores the previous document vectors. If recovery
+fails, it retains the lock and reports the failure instead of serving a mixed
+index. After a server crash or failed recovery, confirm the ingest process has
+stopped, restore Chroma connectivity, remove the stale lock and run
+`npm run ai:ingest` to reconcile the index with the saved source file. This is a
+single-host workflow, not a distributed transaction across machines. Runtime
+files remain ignored by Git.
+
+Run `npm run test:ai-upload` for authorization, file validation, replacement,
+concurrency and rollback checks without calling Gemini or a live database.
 
 ### Application tests
 

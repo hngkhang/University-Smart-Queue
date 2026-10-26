@@ -12,6 +12,7 @@ import {
   Clock3,
   Eye,
   EyeOff,
+  FileText,
   GraduationCap,
   History,
   Inbox,
@@ -42,6 +43,7 @@ import type {
 } from "../services/admin";
 import AppDialog from "../components/AppDialog";
 import AdminDepartments from "./AdminDepartments";
+import AdminKnowledge from "./AdminKnowledge";
 import AdminUserForm, { UserStatusDialog } from "./AdminUserForm";
 import "../styles/admin.css";
 
@@ -49,6 +51,7 @@ const links = [
   { path: "/admin", label: "Overview", icon: LayoutDashboard },
   { path: "/admin/users", label: "User Management", icon: Users },
   { path: "/admin/departments", label: "Departments", icon: Building2 },
+  { path: "/admin/knowledge", label: "Tài liệu AI", icon: FileText },
   { path: "/admin/requests", label: "Password Requests", icon: KeyRound },
   { path: "/admin/activity", label: "Activity Log", icon: History },
 ];
@@ -408,6 +411,7 @@ function AdminPage({ name }: { name: string }) {
   const isUsers = name === "User Management";
   const isActivity = name === "Activity Log";
   const isDepartments = name === "Departments";
+  const isKnowledge = name === "Tài liệu AI";
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setQuery(search);
@@ -416,7 +420,7 @@ function AdminPage({ name }: { name: string }) {
     return () => window.clearTimeout(timer);
   }, [search]);
   useEffect(() => {
-    if (isDepartments) return;
+    if (isDepartments || isKnowledge) return;
     const controller = new AbortController();
     let inFlight = false;
     async function load(showLoading = true) {
@@ -474,7 +478,7 @@ function AdminPage({ name }: { name: string }) {
       controller.abort();
       window.clearInterval(interval);
     };
-  }, [isOverview, isUsers, isActivity, isDepartments, query, page, role, status, accountStatus, refresh]);
+  }, [isOverview, isUsers, isActivity, isDepartments, isKnowledge, query, page, role, status, accountStatus, refresh]);
   function userSaved(text: string) {
     setEditing(null);
     setChangingStatus(null);
@@ -492,6 +496,7 @@ function AdminPage({ name }: { name: string }) {
     "Activity Log":
       "A record of password requests resolved by your admin team.",
     Departments: "Add and manage university service departments.",
+    "Tài liệu AI": "Cập nhật tài liệu hướng dẫn thủ tục và kiến thức cho chatbot.",
   };
   return (
     <div className="aw-app">
@@ -592,7 +597,7 @@ function AdminPage({ name }: { name: string }) {
               <h1>{isOverview ? "Your workspace, at a glance." : name}</h1>
               <p>{descriptions[name]}</p>
             </div>
-            {!isDepartments && <button
+            {!isDepartments && !isKnowledge && <button
               className="sq-button"
               disabled={loading}
               onClick={() => setRefresh((v) => v + 1)}
@@ -700,7 +705,8 @@ function AdminPage({ name }: { name: string }) {
             </>
           )}
           {isDepartments && <AdminDepartments />}
-          {!isDepartments && <div className={isOverview ? "aw-overview-grid" : ""}>
+          {isKnowledge && <AdminKnowledge />}
+          {!isDepartments && !isKnowledge && <div className={isOverview ? "aw-overview-grid" : ""}>
             <section className="aw-panel" aria-busy={loading}>
               <div className="aw-panel-heading">
                 <div>
@@ -1038,7 +1044,7 @@ function AdminPage({ name }: { name: string }) {
             <span>
               {updatedAt
                 ? `Last updated ${date(updatedAt)} (ICT)`
-                : isDepartments ? "Department management" : "Connecting to account services"}
+                : isKnowledge ? "Quản lý tài liệu AI" : isDepartments ? "Department management" : "Connecting to account services"}
             </span>
           </footer>
         </main>

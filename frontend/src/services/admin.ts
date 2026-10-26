@@ -47,10 +47,12 @@ export async function adminApi<T>(
     `${import.meta.env.VITE_API_URL ?? "http://127.0.0.1:5000/api"}/admin${path}`,
     {
       ...options,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.token}`,
-      },
+      headers: (() => {
+        const headers = new Headers(options.headers);
+        if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+        headers.set("Authorization", `Bearer ${session.token}`);
+        return headers;
+      })(),
     },
   );
   if (response.status === 401) clearSession();
