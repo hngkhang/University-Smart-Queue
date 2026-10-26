@@ -1,26 +1,14 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const User = require("../models/User");
 const recoveryLimiter = require("../middleware/recoveryLimiter");
+const { buildUserResponse, issueSession } = require("../lib/authSession");
 
 const router = express.Router();
-router.get("/session", require("../middleware/requireRole")(), (_req, res) => {
-  res.set("Cache-Control", "no-store").json({ valid: true });
-});
-
-const buildUserResponse = (user) => ({
-  id: user._id,
-  fullName: user.fullName,
-  email: user.email,
-  role: user.role,
-  department: user.department,
-  studentID: user.studentID,
-  phone: user.phone,
-  isActive: user.isActive,
-  createdAt: user.createdAt,
-  updatedAt: user.updatedAt,
+router.use("/google", require("./googleAuthRoutes"));
+router.get("/session", require("../middleware/requireRole")(), (req, res) => {
+  res.set("Cache-Control", "no-store").json({ valid: true, user: buildUserResponse(req.user) });
 });
 
 router.post("/login", async (req, res) => {
@@ -66,7 +54,7 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = typeof user.password === "string" && await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
       return res.status(401).json({
@@ -82,24 +70,7 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    const token = jwt.sign(
-      {
-        id: user._id,
-        email: user.email,
-        role: user.role,
-        sessionVersion: user.sessionVersion || 0,
-      },
-      jwtSecret,
-      {
-        expiresIn: rememberMe ? "7d" : "8h",
-      },
-    );
-
-    return res.json({
-      message: "Login successful.",
-      token,
-      user: buildUserResponse(user),
-    });
+    return res.json(issueSession(user, rememberMe));
   } catch (error) {
     console.error("Login error:", error);
     return res.status(500).json({

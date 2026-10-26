@@ -5,6 +5,8 @@ import { useNavigate, useSearchParams } from "react-router";
 
 import campusImage from "../assets/hcmute-campus.jpg";
 import { saveSession } from "../services/session";
+import { startGoogleLogin } from "../services/googleAuth";
+import { loginRedirect } from "../services/loginRedirect";
 import ForgotPasswordDialog from "../components/ForgotPasswordDialog";
 
 const API_BASE_URL =
@@ -32,16 +34,6 @@ type LoginResponse = {
   };
 };
 
-const getRedirectPath = (userRole: LoginResponse["user"]["role"]) => {
-  if (userRole === "admin") return "/admin";
-  if (userRole === "staff") return "/staff";
-  if (userRole === "student") {
-    return "/queue";
-  }
-
-  return "/appointments";
-};
-
 function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -51,10 +43,27 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [status, setStatus] = useState<LoginStatus | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+
+  const handleGoogleLogin = async () => {
+    if (isSubmitting || isGoogleSubmitting) return;
+    setIsGoogleSubmitting(true);
+    setStatus(null);
+    try {
+      await startGoogleLogin(rememberMe, searchParams.get("redirect"));
+    } catch (error) {
+      setStatus({
+        type: "error",
+        text: error instanceof Error ? error.message : "Unable to sign in with Google. Please try again.",
+      });
+      setIsGoogleSubmitting(false);
+    }
+  };
 
   const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isSubmitting || isGoogleSubmitting) return;
 
     if (!email.trim() || !password.trim()) {
       setStatus({
@@ -103,25 +112,7 @@ function LoginPage() {
       });
 
       window.setTimeout(() => {
-        const redirect = searchParams.get("redirect");
-        const safeRedirect =
-          redirect &&
-          /^\/(?:appointments(?:\/new)?|queue|departments\/[a-f\d]{24})(?:\?[^#]*)?$/i.test(
-            redirect,
-          );
-        const staffRedirect =
-          authenticatedUser.role === "staff" &&
-          (redirect === "/staff" || redirect === "/staff/history");
-        const adminRedirect =
-          authenticatedUser.role === "admin" &&
-          /^\/admin(?:\/(?:requests|users|activity))?$/.test(redirect || "");
-        navigate(
-          adminRedirect ||
-            staffRedirect ||
-            (safeRedirect && authenticatedUser.role === "student")
-            ? redirect!
-            : getRedirectPath(authenticatedUser.role),
-        );
+        navigate(loginRedirect(authenticatedUser.role, searchParams.get("redirect")));
       }, 700);
     } catch (error) {
       const message =
@@ -212,6 +203,7 @@ function LoginPage() {
 
             {status ? (
               <p
+                role={status.type === "error" ? "alert" : "status"}
                 className={`mt-5 rounded-lg border px-4 py-3 text-sm font-medium ${
                   status.type === "success"
                     ? "border-emerald-100 bg-emerald-50 text-emerald-800"
@@ -224,11 +216,28 @@ function LoginPage() {
 
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isGoogleSubmitting}
               className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-[#3F6392] px-4 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#2E4B72] hover:shadow active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
             >
               {isSubmitting ? "Signing in..." : "Sign in"}
             </button>
+
+            <div className="my-5 flex items-center gap-3 text-xs text-slate-400">
+              <span className="h-px flex-1 bg-slate-200" />
+              <span>or</span>
+              <span className="h-px flex-1 bg-slate-200" />
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleGoogleLogin()}
+              disabled={isSubmitting || isGoogleSubmitting}
+              className="flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isGoogleSubmitting ? "Connecting to Google..." : "Continue with Google"}
+            </button>
+            <p className="mt-3 text-center text-xs text-slate-500">
+              Google sign-in is available for students.
+            </p>
           </form>
         </div>
       </div>
