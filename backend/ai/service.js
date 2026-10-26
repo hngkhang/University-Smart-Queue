@@ -6,6 +6,7 @@ const { checkKnowledge } = require("./vectorStore");
 const { version: promptVersion } = require("./prompts/ragAnswer");
 const { randomUUID } = require("node:crypto");
 const users = new Map();
+const usage = require("./usage/recorder");
 
 async function getStatus() {
   try {
@@ -20,6 +21,7 @@ async function getStatus() {
 }
 
 function beginQuestion(body, user) {
+  usage.setPrompt(promptVersion);
   const message = body?.message;
   if (typeof message !== "string" || !message.trim() || message.length > getAiConfig().maxQuestionLength) {
     throw new AiError("AI_INVALID_INPUT", "Vui lòng nhập câu hỏi từ 1 đến 2.000 ký tự.", 400);
@@ -33,7 +35,7 @@ function beginQuestion(body, user) {
   state.busy = true;
   state.count++;
   users.set(id, state);
-  const requestId = randomUUID();
+  const requestId = usage.requestId() || randomUUID();
   const metrics = { event: "ai_chat", requestId, model: getAiConfig().chatModel, promptVersion };
   return { message: message.trim(), user, state, now, metrics };
 }
@@ -51,11 +53,13 @@ async function answerQuestion(body, user) {
     if (!status.canChat) throw new AiError("AI_SETUP_REQUIRED", status.message);
     const hits = await retrieve(message, user);
     const result = await generateAnswer(message, hits);
+    usage.setOutcome(result.reasonCode === "AI_INVALID_SOURCES" ? "failed" : result.sources.length ? "success" : "refused", result.reasonCode);
     Object.assign(metrics, { outcome: result.sources.length ? "answered" : "insufficient_evidence", sourceCount: result.sources.length,
       inputTokens: result.usage?.promptTokenCount ?? null, outputTokens: result.usage?.candidatesTokenCount ?? null,
       totalTokens: result.usage?.totalTokenCount ?? null });
     return { answer: result.answer, sources: result.sources };
   } catch (error) {
+    usage.recordError(error);
     Object.assign(metrics, { outcome: "error", code: error instanceof AiError ? error.code : "AI_INTERNAL_ERROR" });
     if (error instanceof AiError) throw error;
     throw new AiError("AI_UNAVAILABLE", "Trợ lý tạm thời gặp lỗi. Vui lòng thử lại sau.");
@@ -76,6 +80,7 @@ async function* streamQuestion(body, user, { signal } = {}) {
       if (signal?.aborted) return;
       if (event.type === "partial") yield { type: "partial", answer: event.answer };
       if (event.type === "done") {
+        usage.setOutcome(event.reasonCode === "AI_INVALID_SOURCES" ? "failed" : event.sources.length ? "success" : "refused", event.reasonCode);
         Object.assign(metrics, { outcome: event.sources.length ? "answered" : "insufficient_evidence", sourceCount: event.sources.length,
           inputTokens: event.usage?.promptTokenCount ?? null, outputTokens: event.usage?.candidatesTokenCount ?? null,
           totalTokens: event.usage?.totalTokenCount ?? null });
@@ -83,6 +88,7 @@ async function* streamQuestion(body, user, { signal } = {}) {
       }
     }
   } catch (error) {
+    usage.recordError(error);
     Object.assign(metrics, { outcome: signal?.aborted ? "cancelled" : "error", code: error instanceof AiError ? error.code : "AI_INTERNAL_ERROR" });
     if (signal?.aborted) return;
     if (error instanceof AiError) throw error;

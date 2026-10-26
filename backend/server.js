@@ -44,6 +44,7 @@ app.use(
     credentials: true,
   }),
 );
+app.use("/api/ai", require("./ai/usage/recorder").aiMiddleware);
 app.use(express.json());
 
 app.get("/", (_req, res) => {
@@ -68,6 +69,10 @@ app.use("/api/appointments", require("./routes/appointmentRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
 app.use("/api/ai", require("./routes/aiRoutes"));
 app.use((error, _req, res, _next) => {
+  if (["entity.parse.failed", "entity.too.large"].includes(error.type)) {
+    require("./ai/usage/recorder").setOutcome("rejected", error.type === "entity.parse.failed" ? "AI_INVALID_JSON" : "AI_BODY_TOO_LARGE");
+    return res.status(error.type === "entity.parse.failed" ? 400 : 413).json({ message: "Invalid or oversized request body." });
+  }
   console.error("API error:", error.message);
   res.status(500).json({ message: "Unable to complete this request. Please try again." });
 });
@@ -77,7 +82,7 @@ mongoose
     serverSelectionTimeoutMS: 5000,
   })
   .then(async () => {
-    await Promise.all([QueueTicket.init(), Appointment.init()]);
+    await Promise.all([QueueTicket.init(), Appointment.init(), require("./models/AiRequestLog").init()]);
     console.log("Connected to MongoDB");
     const admit = () => admitDueAppointments().catch((error) => console.error("Appointment queue admission failed:", error));
     void admit();

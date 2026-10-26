@@ -5,6 +5,8 @@ const User = require("../models/User");
 require("../models/Department");
 
 const router = express.Router();
+router.use((req, res, next) => req.method === "PUT" && /^\/knowledge\/?$/.test(req.path)
+  ? require("../ai/usage/recorder").middleware("knowledge_ingest")(req, res, next) : next());
 router.use(require("../middleware/requireRole")("admin"));
 router.use((_req, res, next) => {
   res.set("Cache-Control", "no-store");
@@ -13,6 +15,7 @@ router.use((_req, res, next) => {
 router.use("/departments", require("./adminDepartmentRoutes"));
 router.use("/users", require("./adminUserRoutes"));
 router.use("/knowledge", require("./adminKnowledgeRoutes"));
+router.use("/ai", require("./adminAiRoutes"));
 const roles = { role: { $in: ["student", "staff"] } };
 const search = (value) => {
   const term = typeof value === "string" ? value.trim().slice(0, 100) : "";

@@ -2,6 +2,9 @@ const { AiError } = require("../errors");
 const { getAiConfig } = require("../config");
 
 const { embedTexts } = require("./embeddings");
+const telemetry = require("../usage/recorder");
+const refused = reason => ["SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII"].includes(reason);
+const refusal = () => new AiError("AI_SAFETY_REFUSAL", "Trợ lý không thể xử lý yêu cầu này theo chính sách an toàn. Vui lòng hỏi về dịch vụ của ứng dụng.", 422);
 
 function providerError(error) {
   if (error instanceof AiError) return error;
@@ -27,6 +30,8 @@ async function generateStructured({ system, input, schema, jsonSchema = false },
   const key = process.env.GEMINI_API_KEY?.trim();
   if (!key) throw new AiError("AI_NOT_CONFIGURED", "Trợ lý chưa được cấu hình kết nối AI.");
   const model = config.chatModel.replace(/^models\//, "");
+  const call = telemetry.beginCall("generation", model);
+  let failure, httpStatus;
   try {
     const response = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
@@ -43,13 +48,16 @@ async function generateStructured({ system, input, schema, jsonSchema = false },
         },
       }),
     });
+    httpStatus = response.status;
     const body = await response.json();
+    call.usage(body.usageMetadata);
     if (!response.ok) {
       const error = new Error("Gemini generation failed");
       error.providerStatus = response.status;
       throw error;
     }
     const candidate = body.candidates?.[0];
+    if (body.promptFeedback?.blockReason || refused(candidate?.finishReason)) throw refusal();
     if (candidate?.finishReason !== "STOP") {
       throw new AiError("AI_INCOMPLETE_ANSWER", "Chưa nhận được câu trả lời đầy đủ. Bạn hãy thử câu hỏi ngắn và cụ thể hơn.", 502);
     }
@@ -57,7 +65,8 @@ async function generateStructured({ system, input, schema, jsonSchema = false },
     let result;
     try { result = JSON.parse(text); } catch { throw new AiError("AI_INVALID_ANSWER", "Trợ lý chưa tạo được câu trả lời hợp lệ. Vui lòng thử lại.", 502); }
     return { data: result, usage: body.usageMetadata || {} };
-  } catch (error) { throw providerError(error); }
+  } catch (error) { failure = error; throw providerError(error); }
+  finally { call.finish(failure, httpStatus); }
 }
 
 async function generateText({ system, question, context }, options) {
@@ -130,6 +139,9 @@ async function* generateTextStream({ system, question, context }, { fetchImpl = 
   let raw = "";
   let usage = {};
   let finishReason;
+  let blocked = false;
+  const call = telemetry.beginCall("generation", model);
+  let failure, httpStatus, completed = false;
   try {
     const response = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
       method: "POST",
@@ -151,6 +163,7 @@ async function* generateTextStream({ system, question, context }, { fetchImpl = 
         },
       }),
     });
+    httpStatus = response.status;
     if (!response.ok) {
       const error = new Error("Gemini generation failed");
       error.providerStatus = response.status;
@@ -159,6 +172,9 @@ async function* generateTextStream({ system, question, context }, { fetchImpl = 
     if (!response.body) throw new AiError("AI_INCOMPLETE_ANSWER", "Chưa nhận được câu trả lời đầy đủ. Vui lòng thử lại.", 502);
     let previous = "";
     for await (const frame of streamFrames(response.body)) {
+      if (frame.promptFeedback?.blockReason) blocked = true;
+      // Streaming metadata is cumulative: replace it, never add chunks together.
+      if (frame.usageMetadata) { usage = frame.usageMetadata; call.usage(usage, { complete: false }); }
       const candidate = frame.candidates?.[0];
       const fragment = candidate?.content?.parts?.filter(part => !part.thought).map(part => part.text || "").join("") || "";
       raw += fragment;
@@ -171,6 +187,9 @@ async function* generateTextStream({ system, question, context }, { fetchImpl = 
         yield { type: "partial", answer: preview };
       }
     }
+    completed = true;
+    call.usage(usage);
+    if (blocked || refused(finishReason)) throw refusal();
     if (finishReason !== "STOP") throw new AiError("AI_INCOMPLETE_ANSWER", "Chưa nhận được câu trả lời đầy đủ. Bạn hãy thử câu hỏi ngắn và cụ thể hơn.", 502);
     let result;
     try { result = JSON.parse(raw); }
@@ -179,7 +198,8 @@ async function* generateTextStream({ system, question, context }, { fetchImpl = 
       throw new AiError("AI_INVALID_ANSWER", "Trợ lý chưa tạo được câu trả lời hợp lệ. Vui lòng thử lại.", 502);
     }
     yield { type: "done", result: { ...result, usage } };
-  } catch (error) { throw providerError(error); }
+  } catch (error) { failure = error; throw providerError(error); }
+  finally { call.finish(failure || (!completed ? { code: "AI_STREAM_INCOMPLETE" } : null), httpStatus); }
 }
 
 module.exports = { embedDocuments: texts => embedTexts(texts, "RETRIEVAL_DOCUMENT"), embedQuery, generateText, generateTextStream, generateStructured, partialAnswer, providerError };

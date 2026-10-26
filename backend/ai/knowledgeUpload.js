@@ -5,6 +5,7 @@ const { TextDecoder } = require("node:util");
 const { prepareIndex, indexDocument } = require("./rag/indexDocument");
 const { embedTexts } = require("./providers/embeddings");
 const storage = require("./rag/storage");
+const telemetry = require("./usage/recorder");
 
 const MAX_BYTES = 2 * 1024 * 1024;
 const DEFAULT_DOCUMENT_ID = "SQ-KB-STUDENT-GUIDE";
@@ -114,6 +115,7 @@ function createKnowledgeUpload({
       operation = { state: "ready", message: "Đã thay thế tài liệu và cập nhật kiến thức cho chatbot." };
       return { ...operation, sourceFile: storage.sourceFile, version: prepared.version, count: result.count, skipped: result.skipped };
     } catch (error) {
+      telemetry.setOutcome(error.publicMessage && error.status < 500 ? "rejected" : "failed", "AI_INGEST_FAILED");
       if (changed) {
         try {
           // Restore the previous vectors, including after a partially successful database write.

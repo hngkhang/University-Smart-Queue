@@ -23,7 +23,7 @@ function getCitedSources(answer, hits) {
 }
 
 function finalizeAnswer(result, hits) {
-  if (!result.supported) return { answer: UNKNOWN, sources: [], usage: result.usage };
+  if (!result.supported) return { answer: UNKNOWN, sources: [], usage: result.usage, reasonCode: "INSUFFICIENT_EVIDENCE" };
   try {
     if (!Array.isArray(result.sourceIds) || !result.sourceIds.length || result.sourceIds.some(id =>
       typeof id !== "string" || !/^S[1-9]\d*$/.test(id) || Number(id.slice(1)) > hits.length)) {
@@ -37,20 +37,20 @@ function finalizeAnswer(result, hits) {
     return { answer, sources: getCitedSources(answer, hits), usage: result.usage };
   }
   catch (error) {
-    if (error.code === "AI_INVALID_SOURCES") return { answer: UNKNOWN, sources: [], usage: result.usage };
+    if (error.code === "AI_INVALID_SOURCES") return { answer: UNKNOWN, sources: [], usage: result.usage, reasonCode: error.code };
     throw error;
   }
 }
 
 async function generateAnswer(question, hits, { generateText = provider.generateText } = {}) {
-  if (!hits.length) return { answer: UNKNOWN, sources: [], usage: {} };
+  if (!hits.length) return { answer: UNKNOWN, sources: [], usage: {}, reasonCode: "NO_RETRIEVAL_MATCH" };
   const result = await generateText({ system: prompt.system, question, context: buildContext(hits) });
   return finalizeAnswer(result, hits);
 }
 
 async function* generateAnswerStream(question, hits, { generateTextStream = provider.generateTextStream, signal } = {}) {
   if (!hits.length) {
-    yield { type: "done", answer: UNKNOWN, sources: [], usage: {} };
+    yield { type: "done", answer: UNKNOWN, sources: [], usage: {}, reasonCode: "NO_RETRIEVAL_MATCH" };
     return;
   }
   for await (const event of generateTextStream({ system: prompt.system, question, context: buildContext(hits) }, { signal })) {

@@ -1,0 +1,68 @@
+.aiu-page, .aiu-overview { color: var(--aw-ink); min-width: 0; }
+.aiu-page { display: grid; gap: 20px; }
+.aiu-overview { margin: 24px 0; }
+.aiu-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.aiu-section-heading h2 { display: flex; align-items: center; gap: 8px; }
+.aiu-page h2, .aiu-overview h2 { margin: 0; font-size: 18px; font-weight: 750; }
+.aiu-page h3 { font-size: 15px; margin: 0 0 8px; }
+.aiu-section-heading p, .aiu-section-heading small { color: var(--aw-muted); margin: 6px 0 0; }
+.aiu-panel { background: white; border: 1px solid var(--aw-line); border-radius: 16px; padding: 22px; min-width: 0; }
+.aiu-filter-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.aiu-filters label { display: flex; flex-direction: column; gap: 7px; font-weight: 600; font-size: 13px; min-width: 0; }
+.aiu-filters :is(input, select) { border: 1px solid #c6d0df; border-radius: 8px; background: white; color: var(--aw-ink); width: 100%; min-width: 0; padding: 10px 12px; min-height: 44px; font: inherit; font-weight: 400; }
+.aiu-search-row { display: flex; gap: 16px; align-items: end; margin-top: 16px; }
+.aiu-search-row label { flex: 1; max-width: 540px; }
+.aiu-page .sq-button, .aiu-overview .sq-button { min-height: 44px; justify-content: center; }
+.aiu-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.aiu-card { background: white; border: 1px solid var(--aw-line); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.aiu-card > span { font-size: 13px; font-weight: 650; color: var(--aw-muted); }
+.aiu-card strong { font-size: clamp(21px, 2.2vw, 29px); font-weight: 750; letter-spacing: -.5px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.aiu-card small, .aiu-muted { color: var(--aw-muted); line-height: 1.6; font-size: 13px; }
+.aiu-explanation { background: #eef4ff; border: 1px solid #d9e5ff; border-radius: 12px; padding: 14px 20px; color: #344f77; line-height: 1.7; font-size: 13px; }
+.aiu-explanation p { margin: 6px 0; }
+.aiu-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.aiu-chart-scroll { overflow-x: auto; padding: 12px 0 28px; }
+.aiu-bars { display: flex; gap: 8px; height: 160px; align-items: end; border-bottom: 1px solid var(--aw-line); margin-bottom: 8px; }
+.aiu-bar-column { position: relative; flex: 1; height: 100%; display: flex; justify-content: end; align-items: center; flex-direction: column; }
+.aiu-bar { width: min(100%, 32px); background: var(--aw-blue); border-radius: 4px 4px 0 0; }
+.aiu-bar-cost { background: #158575; }
+.aiu-bar-column > span { position: absolute; top: calc(100% + 7px); font-size: 11px; color: var(--aw-muted); white-space: nowrap; }
+.aiu-feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin-top: 16px; }
+.aiu-feature-grid article { padding: 16px; background: #f6f8fc; border-radius: 10px; }
+.aiu-feature-grid small { color: var(--aw-muted); }
+.aiu-table-scroll { overflow-x: auto; max-width: 100%; }
+.aiu-page table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+.aiu-page th { color: var(--aw-muted); background: #f7f9fc; font-weight: 650; white-space: nowrap; }
+.aiu-page :is(th, td) { border-bottom: 1px solid var(--aw-line); padding: 14px 12px; vertical-align: top; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.aiu-page td { min-width: 110px; }
+.aiu-page td small { display: block; color: var(--aw-muted); font-size: 12px; max-width: 240px; overflow-wrap: anywhere; margin-top: 5px; }
+.aiu-id { color: var(--aw-blue); display: flex; gap: 6px; align-items: center; font-family: monospace; background: transparent; border: 0; min-height: 36px; padding: 4px 0; }
+.aiu-status { display: inline-block; font-size: 12px; font-weight: 650; padding: 4px 9px; border-radius: 6px; background: #edf1f6; color: #45556b; white-space: nowrap; }
+.aiu-success { background: #e5f5ec; color: #1f6845; }
+.aiu-failed { background: #fdebea; color: #a62b26; }
+.aiu-refused, .aiu-rejected, .aiu-needs_input { background: #fff4da; color: #805409; }
+.aiu-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 20px; }
+.aiu-pagination > div { display: flex; gap: 8px; }
+.aiu-daily summary { cursor: pointer; min-height: 28px; font-weight: 650; }
+.aiu-daily[open] summary { margin-bottom: 16px; }
+.aiu-empty { display: grid; justify-items: center; padding: 30px 20px; text-align: center; gap: 12px; color: var(--aw-muted); }
+.aiu-empty p { max-width: 550px; margin: 0; line-height: 1.7; }
+.aiu-detail { color: #142a42; font-size: 14px; line-height: 1.7; }
+.aiu-detail code { overflow-wrap: anywhere; font-size: 12px; }
+.aiu-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+.aiu-detail-grid dt { color: #607087; font-size: 12px; }
+.aiu-detail-grid dd { margin: 3px 0 0; overflow-wrap: anywhere; font-weight: 600; }
+.aiu-call { background: #f6f8fc; border: 1px solid #e5ebf2; border-radius: 10px; padding: 16px; margin: 12px 0; overflow-wrap: anywhere; }
+.aiu-call h4, .aiu-call p { margin: 4px 0; }
+.aiu-call a { color: #245de4; text-decoration: underline; }
+.aiu-detail .aiu-muted { color: #607087; }
+.aiu-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.aiu-loading { padding: 20px; color: var(--aw-muted); }
+@media (max-width: 1100px) { .aiu-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .aiu-charts { grid-template-columns: 1fr; } }
+@media (max-width: 650px) {
+  .aiu-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .aiu-card { padding: 14px; }.aiu-card strong { font-size: 20px; }
+  .aiu-filter-grid { grid-template-columns: 1fr; }.aiu-filters :is(input, select) { font-size: 16px; }
+  .aiu-panel { padding: 16px; }.aiu-search-row { align-items: stretch; flex-direction: column; }
+  .aiu-detail-grid { grid-template-columns: 1fr; }.aiu-pagination { flex-wrap: wrap; }
+}

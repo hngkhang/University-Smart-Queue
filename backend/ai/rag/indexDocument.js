@@ -2,6 +2,7 @@ const { createHash } = require("node:crypto");
 const { getAiConfig } = require("../config");
 const { prepareMarkdownDocument } = require("./ingest");
 const { DIMENSIONS } = require("../providers/embeddings");
+const telemetry = require("../usage/recorder");
 
 function prepareIndex({ markdown, sourceFile }) {
   const documentId = markdown.match(/^- Mã tài liệu:\s*(.+?)\.?\s*$/m)?.[1];
@@ -64,6 +65,7 @@ async function indexDocument({ prepared, collection, embedDocuments, log = () =>
   if (final.ids.length !== wanted.size || final.ids.some(id => !wanted.has(id))) {
     throw new Error("Unexpected document count after saving. Check for concurrent writers and rerun ingestion.");
   }
+  telemetry.setOutcome("success", complete ? "UNCHANGED_DOCUMENT" : "INDEX_UPDATED");
   return { skipped: complete, count: final.ids.length, removed: staleIds.length };
 }
 

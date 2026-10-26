@@ -4,15 +4,19 @@ const { getStatus, answerQuestion, streamQuestion } = require("../ai/service");
 const { AiError } = require("../ai/errors");
 const studentAuth = require("../middleware/studentAuth");
 const booking = require("../ai/booking/service");
+const usage = require("../ai/usage/recorder");
 
 const router = express.Router();
+// Run before authorization so rejected AI requests are visible as well.
+router.use(usage.aiMiddleware);
 router.get("/booking-status", (_req, res) => {
   res.set("Cache-Control", "no-store").json(booking.getBookingStatus());
 });
 router.post("/booking-draft", studentAuth, async (req, res, next) => {
   res.set("Cache-Control", "no-store");
-  try { res.json(await booking.createBookingDraft(req.body, req.student)); }
+  try { res.json(await usage.trackWork(() => booking.createBookingDraft(req.body, req.student))); }
   catch (error) {
+    usage.recordError(error);
     if (error instanceof AiError) return res.status(error.status).json({ code: error.code, message: error.message });
     next(error);
   }
@@ -24,14 +28,16 @@ router.get("/status", async (_req, res, next) => {
 });
 router.post("/chat", requireRole(), async (req, res, next) => {
   try {
-    res.set("Cache-Control", "no-store").json(await answerQuestion(req.body, req.user));
+    res.set("Cache-Control", "no-store").json(await usage.trackWork(() => answerQuestion(req.body, req.user)));
   } catch (error) {
+    usage.recordError(error);
     if (error instanceof AiError) return res.status(error.status).json({ code: error.code, message: error.message });
     next(error);
   }
 });
 
 router.post("/chat/stream", requireRole(), async (req, res, next) => {
+  const release = usage.hold();
   const controller = new AbortController();
   res.on("close", () => { if (!res.writableEnded) controller.abort(); });
   try {
@@ -48,6 +54,7 @@ router.post("/chat/stream", requireRole(), async (req, res, next) => {
     }
     if (!controller.signal.aborted) res.end();
   } catch (error) {
+    usage.recordError(error);
     if (controller.signal.aborted) return;
     if (!res.headersSent) {
       if (error instanceof AiError) return res.status(error.status).json({ code: error.code, message: error.message });
@@ -55,6 +62,8 @@ router.post("/chat/stream", requireRole(), async (req, res, next) => {
     }
     const safeError = error instanceof AiError ? error : new AiError("AI_UNAVAILABLE", "Trợ lý tạm thời gặp lỗi. Vui lòng thử lại sau.");
     res.end(`${JSON.stringify({ type: "error", code: safeError.code, message: safeError.message })}\n`);
+  } finally {
+    release();
   }
 });
 

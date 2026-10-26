@@ -349,11 +349,67 @@ It does not read personal appointments, book/cancel anything or infer live queue
 The process limits each account to one in-flight request and 10 requests per minute;
 distributed deployments need a shared limiter. Timeouts/quota/network errors are
 localized. Logs include request ID, model, prompt version, latency and generation
-token usage without question text or credentials. Cost estimation, embedding usage
-accounting and the full assignment evaluation report are not implemented yet.
+token usage without question text or credentials. AI request records and estimated
+costs are persisted in MongoDB and shown in Admin → AI Usage & Logs.
+The full assignment evaluation report remains a separate deliverable.
 
 `npm test` runs integration tests against MongoDB using a unique, temporary
 `smartqueue_test_*` database and drops only that database on completion.
 It uses `TEST_MONGODB_URI`, then `MONGODB_URI`, then local MongoDB. The test
 connection needs permission to create databases and indexes. Existing project
 data is not modified by the tests.
+
+### AI usage, logging and costs
+
+Open `/admin/ai` with an active admin account. Overview also shows the last seven
+Vietnam calendar days of interactive AI traffic. The detailed page supports dates,
+scope (interactive / document ingestion / all), feature, status, model, request-ID
+prefix, sorting and server pagination. Statistics refresh every 30 seconds while
+the tab is visible. The four admin-only APIs are `/api/admin/ai/summary`,
+`/timeseries`, `/logs` and `/logs/:requestId` under the same prefix.
+
+Set `AI_BILLING_TIER=free` or `paid` in the backend environment **only if that is
+your actual Google project tier**; otherwise leave it `unconfigured`. This does
+not change your Google subscription. The dashboard always shows list-price USD
+estimates separately from the estimate for the declared tier. Neither is a Google
+invoice. Rates and their sources live in `ai/usage/pricing.js`; update that table
+and its version when changing prices/models. Each provider call saves the applied
+rate snapshot so past costs remain unchanged. Unknown models are unpriced.
+
+Generation usage comes from Gemini metadata, including thinking and cached tokens.
+Streaming usage is cumulative and is replaced on each frame, not summed. Truncated
+streams retain partial token data but their cost stays unknown. If an embedding
+response has no usage, input tokens are approximated as the sum of
+`ceil(Unicode code points / 4)` for each text; the UI explicitly labels this heuristic.
+It is not an exact tokenizer and may be inaccurate for Vietnamese. No additional
+Gemini call is made for logging. A failed call with no usage has unknown cost,
+not zero; a request that made no provider calls has zero provider cost.
+
+One user interaction is one request, containing its provider calls. The interactive
+average excludes ingestion by default. Choosing All includes ingestion operations
+and the average then describes all selected operations. Cost average includes only
+requests for which every provider call can be priced; coverage is shown. The known
+cost total includes priced calls even inside partially priced requests. Latency is
+server end-to-end elapsed time for all finished requests (including rejections and
+cancellations), excluding the asynchronous database write. Model filtering selects
+whole requests containing that model, not only calls for that model.
+
+The collection `airequestlogs` contains operational metadata only: request IDs,
+prompt versions, actual model calls, tokens, rate snapshots, status/reason and timings.
+No user identity, question, answer, document text, raw exception or key is stored.
+`toolsCalled` is empty for the current RAG/structured-output flows: deterministic
+retrieval steps are not LLM tool calls. Logs have no automatic expiry in this version.
+They start at deployment of this feature; old console output is not backfilled.
+
+HTTP logging wraps normal and streaming chat, booking drafts and admin uploads,
+including authorization rejections. `npm run ai:ingest` connects to the same MongoDB
+for CLI logging; `--dry-run` does not connect or write. An unchanged ingestion has no
+embedding calls and zero provider cost. Logging failures do not break AI responses;
+the process reports a safe warning and exposes failed/pending writes on the dashboard.
+This is best-effort logging: there is no durable retry queue, and a process crash or
+database outage can lose a record. Health counters cover only the current process.
+
+Run `npm run test:ai-usage` for deterministic pricing, real MongoDB persistence,
+authorization, filtering, aggregation, streaming and privacy checks. Gemini is mocked;
+no billable calls are made. See `../docs/AI_USAGE_DASHBOARD.md` for the demo checklist
+and requirement traceability.

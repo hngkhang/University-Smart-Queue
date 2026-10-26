@@ -1,5 +1,6 @@
 const express = require("express");
 const knowledge = require("../ai/knowledgeUpload");
+const usage = require("../ai/usage/recorder");
 
 const router = express.Router();
 // Mounted after the admin authentication middleware in adminRoutes.
@@ -14,7 +15,7 @@ router.put("/", (req, res, next) => {
   let filename;
   try { filename = decodeURIComponent(req.get("X-File-Name") || ""); }
   catch { return res.status(400).json({ message: "Tên file không hợp lệ." }); }
-  try { res.json(await knowledge.replace(filename, req.body)); }
+  try { res.json(await usage.trackWork(() => knowledge.replace(filename, req.body))); }
   catch (error) {
     if (error.publicMessage) return res.status(error.status).json({ message: error.publicMessage });
     next(error);

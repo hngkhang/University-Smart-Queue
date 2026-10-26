@@ -1,4 +1,5 @@
 const { getAiConfig } = require("../config");
+const telemetry = require("../usage/recorder");
 
 const DIMENSIONS = 3072;
 
@@ -14,6 +15,9 @@ async function embedTexts(texts, taskType, { fetchImpl = fetch, signal } = {}) {
   if (!texts.length || texts.length > 20 || texts.some(text => typeof text !== "string" || !text.trim())) {
     throw new Error("Embedding requires 1-20 nonempty text passages.");
   }
+  const call = telemetry.beginCall(taskType === "RETRIEVAL_DOCUMENT" ? "embedding_document" : "embedding_query", model);
+  let failure, httpStatus;
+  try {
   const response = await fetchImpl(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:batchEmbedContents`,
     {
@@ -29,6 +33,11 @@ async function embedTexts(texts, taskType, { fetchImpl = fetch, signal } = {}) {
     },
   );
   const body = await response.json();
+  httpStatus = response.status;
+  // batchEmbedContents may not return usage. No extra paid call just for logging.
+  // Count Unicode code points (not UTF-16 units), approximate 4 characters/token.
+  call.usage(body.usageMetadata, { embedding: true,
+    estimatedInput: response.ok ? texts.reduce((sum, text) => sum + Math.ceil([...text].length / 4), 0) : null });
   if (!response.ok) {
     const detail = String(body.error?.message || "Request failed").split(key).join("[REDACTED]");
     const error = new Error(`Gemini HTTP ${response.status}: ${detail}`);
@@ -41,6 +50,8 @@ async function embedTexts(texts, taskType, { fetchImpl = fetch, signal } = {}) {
     throw new Error("Gemini returned invalid or incomplete embedding vectors; nothing will be published.");
   }
   return vectors;
+  } catch (error) { failure = error; throw error; }
+  finally { call.finish(failure, httpStatus); }
 }
 
 module.exports = { DIMENSIONS, embedTexts };

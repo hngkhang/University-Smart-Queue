@@ -8,6 +8,7 @@ const { bookingSchema, bookingJsonSchema } = require("./schema");
 const prompt = require("../prompts/bookingExtract");
 const { dateInVietnam, validBookingDate, slotsFor } = require("../../lib/appointmentSchedule");
 const users = new Map();
+const usage = require("../usage/recorder");
 
 function getBookingStatus() {
   const canDraft = getAiConfig().hasApiKey && mongoose.connection.readyState === 1;
@@ -56,6 +57,7 @@ function normalizeDraft(raw, catalog, now = new Date()) {
 }
 
 async function createBookingDraft(body, student, options = {}) {
+  usage.setPrompt(prompt.version);
   const message = body?.message;
   if (typeof message !== "string" || !message.trim() || message.length > getAiConfig().maxQuestionLength) {
     throw new AiError("AI_INVALID_INPUT", "Nhập nhu cầu đặt lịch từ 1 đến 2.000 ký tự.", 400);
@@ -70,7 +72,7 @@ async function createBookingDraft(body, student, options = {}) {
   const state = users.get(id) || { startedAt, count: 0, busy: false };
   if (state.busy || state.count >= 10) throw new AiError("AI_RATE_LIMIT", "Hãy chờ yêu cầu hiện tại hoàn tất hoặc thử lại sau một phút.", 429);
   state.busy = true; state.count++; users.set(id, state);
-  const metrics = { event: "ai_booking_draft", requestId: randomUUID(), promptVersion: prompt.version,
+  const metrics = { event: "ai_booking_draft", requestId: usage.requestId() || randomUUID(), promptVersion: prompt.version,
     model: getAiConfig().chatModel, toolsCalled: [] };
   try {
     const departments = await (options.loadCatalog || (() => Department.find({ isActive: true, isArchived: { $ne: true }, bookingEnabled: { $ne: false } })
@@ -89,8 +91,11 @@ async function createBookingDraft(body, student, options = {}) {
       outputTokens: generated.usage?.candidatesTokenCount ?? null, totalTokens: generated.usage?.totalTokenCount ?? null });
     const result = normalizeDraft(generated.data, catalog, now);
     metrics.outcome = result.status;
+    usage.setOutcome(result.status === "out_of_scope" ? "refused" : result.status === "needs_input" ? "needs_input" : "success",
+      result.status === "out_of_scope" ? "OUT_OF_SCOPE" : undefined);
     return { ...result, requestId: metrics.requestId };
   } catch (error) {
+    usage.recordError(error);
     metrics.outcome = "error";
     metrics.code = error instanceof AiError ? error.code : "AI_BOOKING_UNAVAILABLE";
     if (error instanceof AiError) throw error;

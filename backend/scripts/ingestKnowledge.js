@@ -6,6 +6,8 @@ const { getAiConfig } = require("../ai/config");
 const { prepareIndex, indexDocument } = require("../ai/rag/indexDocument");
 const { embedTexts, DIMENSIONS } = require("../ai/providers/embeddings");
 const { sourcePath, lockFile, openIngestionCollection } = require("../ai/rag/storage");
+const mongoose = require("mongoose");
+const telemetry = require("../ai/usage/recorder");
 
 async function main() {
   const args = process.argv.slice(2);
@@ -51,7 +53,16 @@ async function main() {
   }
 }
 
-main().catch(error => {
+async function run() {
+  if (process.argv.includes("--dry-run")) return main();
+  // Persist CLI ingestion in the same database as the admin dashboard.
+  // A logging outage must not prevent restoring the knowledge index.
+  try { await mongoose.connect(process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/smart_queue", { serverSelectionTimeoutMS: 3000 }); }
+  catch { console.error("AI logging database unavailable; ingestion will continue with a logging warning."); }
+  try { return await telemetry.operation("knowledge_ingest", main); }
+  finally { await telemetry.flush(); await mongoose.disconnect(); }
+}
+run().catch(error => {
   const key = process.env.GEMINI_API_KEY?.trim();
   const message = String(error.message);
   console.error("INGEST FAILED:", key ? message.split(key).join("[REDACTED]") : message);
