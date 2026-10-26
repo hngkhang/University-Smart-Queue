@@ -117,7 +117,9 @@ router.put("/:id", async (req, res, next) => {
     // Revoke sessions on profile changes so cached names, roles and office assignments are refreshed at sign-in.
     const account = await present(User.findOneAndUpdate(
       { _id: current._id, ...managedRoles, updatedAt: versionFilter(req.body.updatedAt) },
-      { $set: input, $inc: { sessionVersion: 1 } }, { returnDocument: "after", runValidators: true }));
+      { $set: input, $inc: { sessionVersion: 1 },
+        ...(input.email !== current.email ? { $unset: { googleId: "" } } : {}),
+      }, { returnDocument: "after", runValidators: true }));
     if (!account) return conflict(res);
     res.json({ account, message: "Account updated. The user must sign in again." });
   } catch (error) { handleError(error, res, next); }

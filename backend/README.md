@@ -26,6 +26,38 @@ API URL (including `/api`) and restart Vite. When opening the frontend from
 another device, use the backend machine's reachable address instead of
 `127.0.0.1`, and set `CLIENT_URL` to the frontend's exact origin.
 
+## Google student sign-in
+
+The login page includes **Continue with Google** for student accounts. The backend
+mounts `/api/auth/google` and returns to `/auth/google/callback` on the frontend.
+Existing staff and administrator accounts continue to use their password.
+
+Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`, `CLIENT_URL`
+and `JWT_SECRET` in `backend/.env`. For the local localhost setup, use:
+
+```dotenv
+CLIENT_URL=http://localhost:5173
+GOOGLE_CALLBACK_URL=http://localhost:5000/api/auth/google/callback
+```
+
+Set `VITE_API_URL=http://localhost:5000/api` in `frontend/.env`, then open
+`http://localhost:5173/login`. Use the same backend hostname for the API URL and
+callback URL so the browser sends the OAuth state cookie to the callback. Open
+the frontend at exactly `CLIENT_URL` so its tab can recover the sign-in verifier.
+The Google OAuth client's authorized redirect URI must match `GOOGLE_CALLBACK_URL`.
+Production URLs must use HTTPS. Keep the client secret on the backend only.
+
+Run `npm install` in `backend` after pulling these changes, then restart both
+development servers. `GET /api/auth/google/status` should return `enabled: true`
+and the expected frontend origin. A false status means configuration is missing
+or rejected; it does not hide the button. The status check does not verify the
+credentials with Google. The frontend host must serve its app for
+`/auth/google/callback` as well as `/login` when deploying.
+
+Verify locally with `node --test tests/googleOAuth.test.js tests/googleAuthRoutes.test.js`
+from `backend`. Route tests use an isolated temporary database and a simulated
+Google provider; they do not sign into a real Google account.
+
 ## Student endpoints
 
 All queue endpoints require a Bearer JWT and an active student account.

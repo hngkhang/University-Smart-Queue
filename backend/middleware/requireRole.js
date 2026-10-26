@@ -28,7 +28,8 @@ module.exports = (role) => async (req, res, next) => {
       return res
         .status(401)
         .json({ message: "Your session has expired. Please sign in again." });
-    if ((role && user.role !== role) || user.isActive === false)
+    if ((role && user.role !== role) || user.isActive === false ||
+        (payload.authMethod === "google" && user.role !== "student"))
       return res
         .status(403)
         .json({ message: `An active ${role || "user"} account is required.` });

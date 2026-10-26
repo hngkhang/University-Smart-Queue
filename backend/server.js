@@ -82,7 +82,8 @@ mongoose
     serverSelectionTimeoutMS: 5000,
   })
   .then(async () => {
-    await Promise.all([QueueTicket.init(), Appointment.init(), require("./models/AiRequestLog").init()]);
+    await Promise.all([QueueTicket.init(), Appointment.init(), require("./models/AiRequestLog").init(),
+      require("./models/User").init(), require("./models/OAuthTransaction").init()]);
     console.log("Connected to MongoDB");
     const admit = () => admitDueAppointments().catch((error) => console.error("Appointment queue admission failed:", error));
     void admit();

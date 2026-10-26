@@ -4,6 +4,7 @@ import Footer from "./components/Footer";
 import DepartmentPage from "./pages/DepartmentPage";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
+import GoogleCallbackPage from "./pages/GoogleCallbackPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import BookAppointmentPage from "./pages/BookAppointmentPage";
 import AppointmentsPage from "./pages/AppointmentsPage";
@@ -57,6 +58,7 @@ function AppContent() {
           />
 
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
 
           <Route
             path="*"
