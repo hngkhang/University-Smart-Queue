@@ -1,4 +1,5 @@
 const Appointment = require("../models/Appointment");
+const { publishQueueUpdate } = require("./queueEvents");
 const QueueTicket = require("../models/QueueTicket");
 const QueueSequence = require("../models/QueueSequence");
 const Department = require("../models/Department");
@@ -59,6 +60,7 @@ async function admitDueAppointments({ now = new Date(), department, student } = 
           $push: { statusHistory: { status: "cancelled", at: new Date(), actor: appointment.student } },
         });
       } else admitted++;
+      publishQueueUpdate();
     } catch (error) {
       if (error.code !== 11000) throw error;
       // Another API instance admitted this appointment or the student obtained

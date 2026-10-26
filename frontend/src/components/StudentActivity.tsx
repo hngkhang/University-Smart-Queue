@@ -9,6 +9,7 @@ import {
 import { fetchMyQueue } from "../services/queue";
 import { readSession, SESSION_CHANGED_EVENT } from "../services/session";
 import type { Appointment, QueueTicket } from "../types";
+import { subscribeQueueUpdates } from "../services/queueRealtime";
 
 function ActivityDetails() {
   const [activity, setActivity] = useState<{
@@ -21,9 +22,12 @@ function ActivityDetails() {
   useEffect(() => {
     let active = true;
     let pending = false;
+    let queued = false;
     const load = async () => {
-      if (pending || document.hidden) return;
+      if (!active) return;
+      if (pending) { queued = true; return; }
       pending = true;
+      queued = false;
       const [queue, bookings] = await Promise.allSettled([
         fetchMyQueue(),
         fetchAppointments(),
@@ -52,14 +56,15 @@ function ActivityDetails() {
         });
       }
       pending = false;
+      if (active && queued) void load();
     };
     void load();
-    const timer = window.setInterval(() => void load(), 15000);
+    const unsubscribe = subscribeQueueUpdates(() => void load());
     window.addEventListener("focus", load);
     document.addEventListener("visibilitychange", load);
     return () => {
       active = false;
-      window.clearInterval(timer);
+      unsubscribe();
       window.removeEventListener("focus", load);
       document.removeEventListener("visibilitychange", load);
     };

@@ -4,6 +4,8 @@ const { randomUUID } = require("node:crypto");
 const express = require("express");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
+const { io: connectSocket } = require("socket.io-client");
+const { attachQueueRealtime } = require("../lib/queueRealtime");
 require("dotenv").config({ quiet: true });
 const Department = require("../models/Department");
 const Queue = require("../models/Queue");
@@ -14,7 +16,7 @@ const { admitDueAppointments } = require("../lib/appointmentQueue");
 const { reservedMinutes } = require("../lib/appointmentSchedule");
 const databaseName = `smartqueue_test_${randomUUID().replaceAll("-", "").slice(0, 16)}`;
 process.env.JWT_SECRET = randomUUID();
-let server, base, office, otherOffice, staff, colleague, outsider;
+let server, realtime, base, office, otherOffice, staff, colleague, outsider;
 async function account(role, department, isActive = true) {
   const user = await User.create({ fullName: `Test ${role}`, email: `${randomUUID()}@example.test`, password: "unused", role, department, isActive, studentID: role === "student" ? "23110055" : "" });
   return { user, token: jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: "10m" }) };
@@ -42,6 +44,7 @@ before(async () => {
   app.use("/queue", require("../routes/queueRoutes"));
   app.use("/appointments", require("../routes/appointmentRoutes"));
   server = app.listen(0, "127.0.0.1");
+  realtime = attachQueueRealtime(server, { isAllowedOrigin: (origin) => origin === "http://localhost:5173" });
   await new Promise((resolve) => server.once("listening", resolve));
   base = `http://127.0.0.1:${server.address().port}`;
 });
@@ -52,10 +55,123 @@ beforeEach(async () => {
   [staff, colleague, outsider] = await Promise.all([account("staff", office._id), account("staff", office._id), account("staff", otherOffice._id)]);
 });
 after(async () => {
-  if (server) await new Promise((resolve) => server.close(resolve));
+  if (realtime) await new Promise((resolve) => realtime.close(resolve));
+  else if (server) await new Promise((resolve) => server.close(resolve));
   try {
     if (mongoose.connection.readyState === 1 && mongoose.connection.name === databaseName && databaseName.startsWith("smartqueue_test_")) await mongoose.connection.dropDatabase();
   } finally { await mongoose.disconnect(); }
+});
+
+function socketEvent(socket, event) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      socket.off(event, received);
+      reject(new Error(`Timed out waiting for ${event}`));
+    }, 4000);
+    const received = (...args) => { clearTimeout(timer); resolve(args); };
+    socket.once(event, received);
+  });
+}
+
+async function liveClient(t, token, options = {}) {
+  const socket = connectSocket(base, {
+    transports: ["websocket"], auth: { token }, autoConnect: false,
+    reconnection: false, ...options,
+  });
+  t.after(() => socket.disconnect());
+  const connected = socketEvent(socket, "connect");
+  socket.connect();
+  await connected;
+  assert.equal(socket.io.engine.transport.name, "websocket");
+  return socket;
+}
+
+test("WebSocket pushes each saved staff transition to students and colleagues without polling", async (t) => {
+  const student = await join();
+  const nextStudent = await join();
+  const studentSocket = await liveClient(t, student.token);
+  const colleagueSocket = await liveClient(t, colleague.token);
+  for (const [action, status] of [["call", "called"], ["recall", "called"], ["start", "serving"], ["complete", "completed"]]) {
+    const updates = [socketEvent(studentSocket, "queue:updated"), socketEvent(colleagueSocket, "queue:updated")];
+    const response = action === "call" ? await call() : await act(student.ticket._id, action);
+    assert.equal(response.status, 200);
+    // The broadcast contains no student names, ticket IDs or other private data.
+    for (const args of await Promise.all(updates)) assert.deepEqual(args, []);
+    const snapshot = (await mine(student)).data;
+    const ticket = snapshot.ticket || snapshot.history[0];
+    assert.equal(ticket.status, status);
+    if (action === "recall") assert.ok(new Date(ticket.lastCalledAt) >= new Date(ticket.calledAt));
+  }
+  assert.equal((await mine(nextStudent)).data.ticket.peopleAhead, 0);
+});
+
+test("WebSocket notifies staff about joins, student cancellations, pauses and automatic admission", async (t) => {
+  const socket = await liveClient(t, staff.token);
+  let update = socketEvent(socket, "queue:updated");
+  const student = await join();
+  await update;
+  update = socketEvent(socket, "queue:updated");
+  assert.equal((await request(`/queue/${student.ticket._id}/cancel`, student.token, "PATCH")).status, 200);
+  await update;
+  for (const paused of [true, false]) {
+    update = socketEvent(socket, "queue:updated");
+    assert.equal((await request("/staff/queue/pause", staff.token, "PATCH", { paused })).status, 200);
+    await update;
+  }
+  const owner = await account("student");
+  await scheduledFor(owner);
+  update = socketEvent(socket, "queue:updated");
+  assert.equal(await admitDueAppointments(), 1);
+  await update;
+});
+
+test("WebSocket rejects invalid, expired, inactive and revoked sessions and untrusted origins", async (t) => {
+  const inactive = await account("student", undefined, false);
+  const revoked = await account("student");
+  await User.updateOne({ _id: revoked.user._id }, { $inc: { sessionVersion: 1 } });
+  const admin = await account("admin");
+  const expired = jwt.sign({ id: staff.user.id }, process.env.JWT_SECRET, { expiresIn: -1 });
+  for (const token of [undefined, "invalid", expired, inactive.token, revoked.token, admin.token]) {
+    const socket = connectSocket(base, { transports: ["websocket"], auth: { token }, autoConnect: false, reconnection: false });
+    t.after(() => socket.disconnect());
+    const failure = socketEvent(socket, "connect_error");
+    socket.connect();
+    const [error] = await failure;
+    assert.match(error.message, /sign in again/);
+    assert.equal(socket.connected, false);
+  }
+  const socket = connectSocket(base, {
+    transports: ["websocket"], auth: { token: staff.token }, autoConnect: false,
+    reconnection: false, extraHeaders: { Origin: "https://untrusted.example" },
+  });
+  t.after(() => socket.disconnect());
+  const failure = socketEvent(socket, "connect_error");
+  socket.connect();
+  await failure;
+  assert.equal(socket.connected, false);
+});
+
+test("WebSocket reconnects after transport loss and can load changes missed offline", async (t) => {
+  const student = await join();
+  const socket = await liveClient(t, student.token, { reconnection: true, reconnectionDelay: 200, randomizationFactor: 0 });
+  const disconnected = socketEvent(socket, "disconnect");
+  const reconnected = socketEvent(socket, "connect");
+  realtime.sockets.sockets.get(socket.id).conn.close();
+  await disconnected;
+  assert.equal((await call()).status, 200);
+  await reconnected;
+  assert.equal((await mine(student)).data.ticket.status, "called");
+  const update = socketEvent(socket, "queue:updated");
+  await act(student.ticket._id, "start");
+  await update;
+  assert.equal((await mine(student)).data.ticket.status, "serving");
+});
+
+test("WebSocket closes when its authenticated token expires", async (t) => {
+  const token = jwt.sign({ id: staff.user.id }, process.env.JWT_SECRET, { expiresIn: 2 });
+  const socket = await liveClient(t, token);
+  const [reason] = await socketEvent(socket, "disconnect");
+  assert.equal(reason, "io server disconnect");
 });
 
 test("real staff transitions are visible to students and persist after reload", async () => {

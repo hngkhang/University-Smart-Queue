@@ -1,4 +1,5 @@
 const express = require("express");
+const { publishQueueUpdate } = require("../lib/queueEvents");
 const mongoose = require("mongoose");
 const requireRole = require("../middleware/requireRole");
 const Department = require("../models/Department");
@@ -61,6 +62,7 @@ router.patch("/queue/pause", async (req, res) => {
     return res.status(400).json({ message: "Choose whether to pause calls." });
   const queue = await Queue.findOneAndUpdate({ department: req.department._id }, { $set: { isPaused: req.body.paused } }, { returnDocument: "after" }).lean();
   if (!queue) return res.status(409).json({ message: "Your office queue has not been opened yet." });
+  publishQueueUpdate();
   res.json({ paused: queue.isPaused });
 });
 
@@ -83,6 +85,7 @@ router.post("/queue/call", async (req, res) => {
     { sort: { serviceDate: 1, number: 1 }, returnDocument: "after" },
   ).lean();
   if (!ticket) return res.status(409).json({ message: "No students are waiting. Refresh your queue." });
+  publishQueueUpdate();
   res.json({ message: `Q-${String(ticket.number).padStart(3, "0")} has been called.` });
 });
 
@@ -113,6 +116,7 @@ router.patch("/tickets/:id/:action", async (req, res) => {
     await Appointment.updateOne({ _id: ticket.appointment, status: "confirmed" },
       { $set: { status: "cancelled", cancelledAt: now } });
   }
+  publishQueueUpdate();
   res.json({ message: req.params.action === "recall" ? "Student called again." : "Visit status updated." });
 });
 

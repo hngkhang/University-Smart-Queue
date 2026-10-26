@@ -3,6 +3,8 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const mongoose = require("mongoose");
 const path = require("node:path");
+const { createServer } = require("node:http");
+const { attachQueueRealtime } = require("./lib/queueRealtime");
 const authRoutes = require("./routes/authRoutes");
 const departmentRoutes = require("./routes/departmentRoutes");
 const queueRoutes = require("./routes/queueRoutes");
@@ -79,7 +81,11 @@ mongoose
     const admit = () => admitDueAppointments().catch((error) => console.error("Appointment queue admission failed:", error));
     void admit();
     setInterval(admit, 15000).unref();
-    app.listen(port, () => {
+    const server = createServer(app);
+    attachQueueRealtime(server, {
+      isAllowedOrigin: (origin) => allowedOrigins.includes(origin) || isLocalDevOrigin(origin),
+    });
+    server.listen(port, () => {
       console.log(`Server is running on port ${port}`);
     });
   })
