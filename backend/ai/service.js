@@ -1,7 +1,7 @@
 const { getAiConfig } = require("./config");
 const { AiError } = require("./errors");
 const { retrieve } = require("./rag/retrieve");
-const { generateAnswer } = require("./rag/generate");
+const { generateAnswer, generateAnswerStream } = require("./rag/generate");
 const { checkKnowledge } = require("./vectorStore");
 const { version: promptVersion } = require("./prompts/ragAnswer");
 const { randomUUID } = require("node:crypto");
@@ -19,7 +19,7 @@ async function getStatus() {
   }
 }
 
-async function answerQuestion(body, user) {
+function beginQuestion(body, user) {
   const message = body?.message;
   if (typeof message !== "string" || !message.trim() || message.length > getAiConfig().maxQuestionLength) {
     throw new AiError("AI_INVALID_INPUT", "Vui lòng nhập câu hỏi từ 1 đến 2.000 ký tự.", 400);
@@ -35,11 +35,22 @@ async function answerQuestion(body, user) {
   users.set(id, state);
   const requestId = randomUUID();
   const metrics = { event: "ai_chat", requestId, model: getAiConfig().chatModel, promptVersion };
+  return { message: message.trim(), user, state, now, metrics };
+}
+
+function finishQuestion(state, now, metrics) {
+  state.busy = false;
+  // Do not log questions, user identities, retrieved text or credentials.
+  console.info(JSON.stringify({ ...metrics, latencyMs: Date.now() - now }));
+}
+
+async function answerQuestion(body, user) {
+  const { message, state, now, metrics } = beginQuestion(body, user);
   try {
     const status = await getStatus();
     if (!status.canChat) throw new AiError("AI_SETUP_REQUIRED", status.message);
-    const hits = await retrieve(message.trim(), user);
-    const result = await generateAnswer(message.trim(), hits);
+    const hits = await retrieve(message, user);
+    const result = await generateAnswer(message, hits);
     Object.assign(metrics, { outcome: result.sources.length ? "answered" : "insufficient_evidence", sourceCount: result.sources.length,
       inputTokens: result.usage?.promptTokenCount ?? null, outputTokens: result.usage?.candidatesTokenCount ?? null,
       totalTokens: result.usage?.totalTokenCount ?? null });
@@ -49,10 +60,37 @@ async function answerQuestion(body, user) {
     if (error instanceof AiError) throw error;
     throw new AiError("AI_UNAVAILABLE", "Trợ lý tạm thời gặp lỗi. Vui lòng thử lại sau.");
   } finally {
-    state.busy = false;
-    // Do not log questions, user identities, retrieved text or credentials.
-    console.info(JSON.stringify({ ...metrics, latencyMs: Date.now() - now }));
+    finishQuestion(state, now, metrics);
   }
 }
 
-module.exports = { getStatus, answerQuestion };
+async function* streamQuestion(body, user, { signal } = {}) {
+  const { message, state, now, metrics } = beginQuestion(body, user);
+  try {
+    const status = await getStatus();
+    if (!status.canChat) throw new AiError("AI_SETUP_REQUIRED", status.message);
+    if (signal?.aborted) return;
+    const hits = await retrieve(message, user);
+    if (signal?.aborted) return;
+    for await (const event of generateAnswerStream(message, hits, { signal })) {
+      if (signal?.aborted) return;
+      if (event.type === "partial") yield { type: "partial", answer: event.answer };
+      if (event.type === "done") {
+        Object.assign(metrics, { outcome: event.sources.length ? "answered" : "insufficient_evidence", sourceCount: event.sources.length,
+          inputTokens: event.usage?.promptTokenCount ?? null, outputTokens: event.usage?.candidatesTokenCount ?? null,
+          totalTokens: event.usage?.totalTokenCount ?? null });
+        yield { type: "done", answer: event.answer, sources: event.sources };
+      }
+    }
+  } catch (error) {
+    Object.assign(metrics, { outcome: signal?.aborted ? "cancelled" : "error", code: error instanceof AiError ? error.code : "AI_INTERNAL_ERROR" });
+    if (signal?.aborted) return;
+    if (error instanceof AiError) throw error;
+    throw new AiError("AI_UNAVAILABLE", "Trợ lý tạm thời gặp lỗi. Vui lòng thử lại sau.");
+  } finally {
+    if (signal?.aborted && !metrics.outcome) metrics.outcome = "cancelled";
+    finishQuestion(state, now, metrics);
+  }
+}
+
+module.exports = { getStatus, answerQuestion, streamQuestion };

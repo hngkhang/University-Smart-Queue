@@ -47,8 +47,8 @@ Queue entries require an active department and a queue with `isOpen: true` and
 queue flags. Multiple selected services assume the department can handle them
 in a single visit.
 
-My Queue reloads persisted data every 15 seconds while visible and when the
-window regains focus. Waiting counts and people ahead are based on saved tickets.
+My Queue receives WebSocket update signals and reloads persisted data after each
+change, on reconnect, and when the window regains focus. Waiting counts and people ahead are based on saved tickets.
 Waiting-time estimates and active-counter counts are `null` until counter
 availability and service progress are implemented. Missing service durations
 also remain unknown instead of becoming zero-minute estimates.
@@ -91,8 +91,40 @@ Each transition records its timestamp and actor in `statusHistory`; legacy
 tickets remain readable without fabricated timestamps. Restart the backend to
 load these routes and initialize the new index before using live staff actions.
 
-Both staff and student screens refresh every 5 seconds while visible and when
-returning to the page. The development preview continues to use isolated demo data.
+Staff, My Queue, My Appointments, and the student's home activity receive live
+updates through Socket.IO with `transports: ["websocket"]`; there is no queue
+polling or HTTP long-polling fallback. The development preview continues to use
+isolated demo data.
+
+### WebSocket setup and verification
+
+Run `npm install` in both `backend` and `frontend`, then restart both dev servers.
+Socket.IO shares the API's HTTP server and port, at `/socket.io/`. The browser
+uses the origin of `VITE_API_URL`; configure a reverse proxy to forward WebSocket
+upgrades for `/socket.io/` to the backend, and set `CLIENT_URL` to the frontend
+origin. HTTPS deployments automatically use secure WebSocket (WSS).
+
+The handshake sends the existing JWT in `auth.token`. The server verifies its
+signature, expiry, account role, active status, and session version. Expired
+connections close; revoked sessions are rechecked every 30 seconds. Only
+authenticated students/staff receive `queue:updated`, an empty invalidation
+signal with no ticket or personal data. Each client then fetches its own
+authorized API snapshot. Signals cover joins, calls/recalls, service transitions,
+cancellations, pause/resume, appointment admission/expiry, and office edits.
+Initial connection and reconnection also refresh the snapshot to recover missed
+events. Updates received during an in-flight fetch trigger another fetch.
+
+To check manually, open a student session and a staff session in separate browser
+profiles. Join the staff's office queue, keep My Queue open, then call, recall,
+start, and complete the visit as staff. The student status/history and other
+waiting students' people-ahead counts update immediately. In browser Network,
+verify `/socket.io/?EIO=4&transport=websocket` upgrades with status 101 and there
+are no repeated 5-second queue requests. Disconnect/reconnect the student's
+network and confirm the latest state loads automatically.
+
+`node --test tests/staff.test.js` includes real WebSocket integration checks.
+The current event bus supports one backend process. Multiple backend instances
+would need a shared event bus/Socket.IO adapter before deployment.
 
 ## Appointment booking
 
@@ -192,6 +224,21 @@ visit before disabling their account or changing their role/office. Students
 must resolve active tickets/upcoming appointments before changing roles.
 
 ## Verification
+
+### Streaming AI answers
+
+The assistant's **Hỏi đáp thủ tục** mode sends authenticated questions to
+`POST /api/ai/chat/stream`. The endpoint reads Gemini's streamed structured
+response and forwards newline-delimited JSON events: `partial` contains the
+answer text received so far, `done` contains the final answer and verified
+sources, and `error` reports a failure after streaming has begun. The existing
+`POST /api/ai/chat` JSON endpoint remains available. A disconnected browser
+aborts the upstream generation, and the chat removes an unfinished answer if
+the stream fails. In deployments behind a reverse proxy, disable response
+buffering for `/api/ai/chat/stream` so each update reaches the browser promptly.
+
+Run `node --test tests/aiStreaming.test.js tests/aiStreamingRoutes.test.js`
+from `backend/` to verify the streaming protocol without MongoDB or an AI key.
 
 ### AI knowledge ingestion (local Chroma, no Docker)
 

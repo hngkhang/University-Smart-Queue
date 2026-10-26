@@ -403,7 +403,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
                 <>
                   <strong>Live service</strong>
                   <span>
-                    Actions update student tickets. The queue refreshes every 5 seconds.
+                    Actions update student tickets. Queue changes arrive live from the server.
                   </span>
                 </>
               )}
@@ -528,7 +528,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
           )}
           {!demo && user.department && (
             <div className="sw-office-feedback" role={live.error ? "alert" : "status"}>
-              {live.error || (!live.data ? "Loading live queue…" : live.busy ? "Saving your action…" : "Live queue connected.")}
+              {live.error || (!live.data ? "Loading live queue…" : live.busy ? "Saving your action…" : live.realtimeStatus === "connected" ? "Live queue connected." : "Live updates disconnected. Waiting to reconnect; refresh the queue if needed.")}
               {live.error && live.data && " Displayed information may be out of date."}{" "}
               <button disabled={live.busy} onClick={live.refresh}>Refresh queue</button>
             </div>
@@ -992,7 +992,7 @@ function Workspace({ user, preview }: { user: SessionUser; preview: boolean }) {
               <span className="sw-state-dot" />
               {demo
                 ? "Demo session · Changes reset on reload"
-                : "Live service · Updates every 5 seconds"}
+                : "Live service · Real-time queue updates"}
             </span>
             <span>Small moments. Better campus days.</span>
           </footer>

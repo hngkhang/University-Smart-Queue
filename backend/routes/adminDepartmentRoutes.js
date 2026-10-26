@@ -1,4 +1,5 @@
 const express = require("express");
+const { publishQueueUpdate } = require("../lib/queueEvents");
 const mongoose = require("mongoose");
 const Department = require("../models/Department");
 const Queue = require("../models/Queue");
@@ -109,6 +110,7 @@ router.put("/:id", async (req, res, next) => {
       { $set: input }, { returnDocument: "after", runValidators: true }).lean();
     if (!department) return res.status(404).json({ message: "Department not found." });
     if (!department.isActive) await Queue.updateMany({ department: department._id }, { $set: { isOpen: false, isPaused: false } });
+    publishQueueUpdate();
     res.json({ department: present(department) });
   } catch (error) { next(error); }
 });
@@ -124,6 +126,7 @@ router.delete("/:id", async (req, res, next) => {
     await Department.updateOne({ _id: department._id, ...activeFilter },
       { $set: { isArchived: true, isActive: false, bookingEnabled: false } });
     await Queue.updateMany({ department: department._id }, { $set: { isOpen: false, isPaused: false } });
+    publishQueueUpdate();
     res.json({ message: "Department deleted." });
   } catch (error) { next(error); }
 });

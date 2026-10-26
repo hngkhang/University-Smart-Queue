@@ -21,6 +21,8 @@ import type { QueueTicket } from "../types";
 import TicketProgress from "../components/TicketProgress";
 import { ticketStatusLabels as labels } from "../services/queue";
 import { appointmentTime } from "../services/appointments";
+import { subscribeQueueUpdates } from "../services/queueRealtime";
+import type { RealtimeStatus } from "../services/queueRealtime";
 
 const dateLabel = (value: string) =>
   new Intl.DateTimeFormat("en-GB", {
@@ -46,6 +48,7 @@ export default function MyQueuePage() {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [notice, setNotice] = useState("");
+  const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("connecting");
   const cancelLock = useRef(false);
   const revision = useRef(0);
   const lastTicket = useRef<QueueTicket | null>(null);
@@ -69,9 +72,12 @@ export default function MyQueuePage() {
     if (!session || session.user.role !== "student") return;
     let active = true;
     let pending = false;
+    let queued = false;
     async function load() {
-      if (pending || cancelLock.current) return;
+      if (!active || cancelLock.current) return;
+      if (pending) { queued = true; return; }
       pending = true;
+      queued = false;
       const requestRevision = revision.current;
       setRefreshing(true);
       try {
@@ -82,6 +88,8 @@ export default function MyQueuePage() {
           if (updated && previous && updated.status !== previous.status) {
             setNotice(`${updated.reference}: ${labels[updated.status]}.${updated.status === "no_show" ? " You missed your turn. You can join the queue again." : updated.status === "cancelled" ? updated.cancellationReason === "end_of_day" ? " The service day has ended. Get a new ticket on the next working day or book another appointment." : " Your ticket was cancelled. You can join the queue again." : updated.status === "completed" ? " Your visit is complete." : ""}`);
             setConfirmCancel(false);
+          } else if (updated?.status === "called" && previous && updated.lastCalledAt !== previous.lastCalledAt) {
+            setNotice(`${updated.reference}: Your number has been called again. Please go to the department now.`);
           }
           lastTicket.current = result.ticket;
           setData(result);
@@ -103,12 +111,11 @@ export default function MyQueuePage() {
       } finally {
         pending = false;
         if (active) setRefreshing(false);
+        if (active && queued) void load();
       }
     }
     void load();
-    const timer = window.setInterval(() => {
-      if (!document.hidden) void load();
-    }, 5000);
+    const unsubscribe = subscribeQueueUpdates(() => void load(), setRealtimeStatus);
     const onFocus = () => {
       void load();
     };
@@ -117,7 +124,7 @@ export default function MyQueuePage() {
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       active = false;
-      window.clearInterval(timer);
+      unsubscribe();
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisible);
     };
@@ -192,6 +199,13 @@ export default function MyQueuePage() {
           Refresh
         </button>
       </header>
+      <p role="status" className="mb-5 text-sm text-slate-500">
+        {realtimeStatus === "connected"
+          ? "Live updates connected."
+          : realtimeStatus === "connecting"
+            ? "Connecting to live updates…"
+            : "Live updates disconnected. Reconnecting automatically; use Refresh if needed."}
+      </p>
       {displayNotice && (
         <p
           role="status"
@@ -334,7 +348,7 @@ export default function MyQueuePage() {
           </div>
           <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 px-6 py-4">
             <p className="max-w-md text-xs leading-5 text-slate-500">
-              Updates automatically every 5 seconds. Please be at the
+              Updates arrive live from the server. Please be at the
               department when your number is called.
             </p>
             {ticket.status === "waiting" && !ticket.appointmentReference && !confirmCancel && (

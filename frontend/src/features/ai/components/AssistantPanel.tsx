@@ -83,10 +83,11 @@ export default function AssistantPanel({ onClose, onDock, assistant, booking, mo
         <div className="sq-ai-messages" role="log" aria-label="Hội thoại" aria-live="polite">
           {messages.map((message) => <article key={message.id} className={`sq-ai-message sq-ai-message-${message.role}`}>
             <span className="sq-ai-sender">{message.role === "user" ? "Bạn" : "Trợ lý"}</span>
-            <p>{message.content}</p>
+            <p>{message.content || (sending ? "Đang tìm câu trả lời…" : "")}</p>
             {message.sources?.map((source) => <SourceCard key={source.chunkId} source={source} />)}
           </article>)}
-          {sending && <p className="sq-ai-progress">Đang tìm câu trả lời…</p>}
+          {sending && messages.at(-1)?.role === "assistant" && Boolean(messages.at(-1)?.content) &&
+            <p className="sq-ai-progress">Đang trả lời…</p>}
         </div>
         <div className="sq-ai-notice" role="status">
           {!status && !error ? "Đang kiểm tra kết nối…" : status?.message}

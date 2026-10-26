@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchStaffQueue, updateStaffQueue } from "../../services/staff";
 import type { StaffAction, StaffQueue } from "../../services/staff";
+import { subscribeQueueUpdates } from "../../services/queueRealtime";
+import type { RealtimeStatus } from "../../services/queueRealtime";
 
 export function useStaffQueue(enabled: boolean) {
   const [data, setData] = useState<StaffQueue | null>(null);
@@ -8,6 +10,8 @@ export function useStaffQueue(enabled: boolean) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [retry, setRetry] = useState(0);
+  const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("connecting");
+  const drainUpdates = useRef<() => void>(() => {});
   const lock = useRef(false);
   const revision = useRef(0);
   const epoch = useRef(0);
@@ -15,9 +19,12 @@ export function useStaffQueue(enabled: boolean) {
   useEffect(() => {
     const generation = ++epoch.current;
     let pending = false;
+    let queued = false;
     async function load() {
-      if (!enabled || pending || lock.current) return;
+      if (!enabled || generation !== epoch.current) return;
+      if (pending || lock.current) { queued = true; return; }
       pending = true;
+      queued = false;
       const version = revision.current;
       try {
         const result = await fetchStaffQueue();
@@ -28,16 +35,20 @@ export function useStaffQueue(enabled: boolean) {
       } catch (reason) {
         if (generation === epoch.current && version === revision.current)
           setError(reason instanceof Error ? reason.message : "Unable to load the queue.");
-      } finally { pending = false; }
+      } finally {
+        pending = false;
+        if (queued && generation === epoch.current && !lock.current) void load();
+      }
     }
+    drainUpdates.current = () => { if (queued) void load(); };
     void load();
     const refresh = () => { if (!document.hidden) void load(); };
-    const timer = window.setInterval(refresh, 5000);
+    const unsubscribe = enabled ? subscribeQueueUpdates(() => void load(), setRealtimeStatus) : () => {};
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
     return () => {
       epoch.current = generation + 1;
-      window.clearInterval(timer);
+      unsubscribe();
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", refresh);
     };
@@ -68,9 +79,10 @@ export function useStaffQueue(enabled: boolean) {
         setBusy(false);
         setError(failure);
         if (!failure) setNotice(action === "recall" ? "Student called again." : "Queue updated successfully.");
+        drainUpdates.current();
       }
     }
     return !failure;
   }
-  return { data, error, notice, busy, act, refresh: () => setRetry((value) => value + 1) };
+  return { data, error, notice, busy, realtimeStatus, act, refresh: () => setRetry((value) => value + 1) };
 }

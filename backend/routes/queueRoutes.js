@@ -1,4 +1,5 @@
 const express = require("express");
+const { publishQueueUpdate } = require("../lib/queueEvents");
 const mongoose = require("mongoose");
 const Department = require("../models/Department");
 const Queue = require("../models/Queue");
@@ -169,6 +170,7 @@ router.post("/", async (req, res) => {
     }
     throw error;
   }
+  publishQueueUpdate();
   return res
     .status(201)
     .json({ ticket: await ticketResponse(ticket.toObject()) });
@@ -198,6 +200,7 @@ router.patch("/:id/cancel", async (req, res) => {
       .json({
         message: "This ticket can no longer be cancelled. Refresh My Queue.",
       });
+  publishQueueUpdate();
   return res.json({ ticket: await ticketResponse(ticket) });
 });
 

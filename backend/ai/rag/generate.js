@@ -22,13 +22,7 @@ function getCitedSources(answer, hits) {
   });
 }
 
-async function generateAnswer(question, hits, { generateText = provider.generateText } = {}) {
-  if (!hits.length) return {
-    answer: UNKNOWN, sources: [], usage: {},
-  };
-  const result = await generateText({
-    system: prompt.system, question, context: buildContext(hits),
-  });
+function finalizeAnswer(result, hits) {
   if (!result.supported) return { answer: UNKNOWN, sources: [], usage: result.usage };
   try {
     if (!Array.isArray(result.sourceIds) || !result.sourceIds.length || result.sourceIds.some(id =>
@@ -48,4 +42,21 @@ async function generateAnswer(question, hits, { generateText = provider.generate
   }
 }
 
-module.exports = { buildContext, getCitedSources, generateAnswer, UNKNOWN };
+async function generateAnswer(question, hits, { generateText = provider.generateText } = {}) {
+  if (!hits.length) return { answer: UNKNOWN, sources: [], usage: {} };
+  const result = await generateText({ system: prompt.system, question, context: buildContext(hits) });
+  return finalizeAnswer(result, hits);
+}
+
+async function* generateAnswerStream(question, hits, { generateTextStream = provider.generateTextStream, signal } = {}) {
+  if (!hits.length) {
+    yield { type: "done", answer: UNKNOWN, sources: [], usage: {} };
+    return;
+  }
+  for await (const event of generateTextStream({ system: prompt.system, question, context: buildContext(hits) }, { signal })) {
+    if (event.type === "partial") yield event;
+    if (event.type === "done") yield { type: "done", ...finalizeAnswer(event.result, hits) };
+  }
+}
+
+module.exports = { buildContext, getCitedSources, generateAnswer, generateAnswerStream, finalizeAnswer, UNKNOWN };

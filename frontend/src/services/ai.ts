@@ -57,18 +57,57 @@ export async function fetchAssistantStatus(signal: AbortSignal): Promise<Assista
   return data;
 }
 
-export async function sendAssistantMessage(message: string, signal: AbortSignal): Promise<{
+export async function sendAssistantMessage(message: string, signal: AbortSignal, onPartial: (answer: string) => void): Promise<{
   answer: string; sources: AssistantSource[];
 }> {
   const session = readSession();
   if (!session) throw new Error("Vui lòng đăng nhập để gửi câu hỏi.");
-  const data = await request("/chat", {
-    method: "POST", signal,
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.token}` },
-    body: JSON.stringify({ message }),
-  });
-  if (typeof data.answer !== "string" || !data.answer.trim() || !Array.isArray(data.sources)) {
-    throw new Error("Chưa thể nhận câu trả lời hợp lệ. Vui lòng thử lại.");
+  const timeout = AbortSignal.timeout(120000);
+  const combinedSignal = AbortSignal.any([signal, timeout]);
+  try {
+    const response = await fetch(`${API_BASE_URL}/ai/chat/stream`, {
+      method: "POST", signal: combinedSignal,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.token}` },
+      body: JSON.stringify({ message }),
+    });
+    if (!response.ok) {
+      const body = response.headers.get("content-type")?.includes("application/json") ? await response.json() : null;
+      throw new Error(body?.message || "Chưa thể gửi câu hỏi. Vui lòng thử lại.");
+    }
+    if (!response.body) throw new Error("Trình duyệt không nhận được luồng trả lời.");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let pending = "";
+    let result: { answer: string; sources: AssistantSource[] } | null = null;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        pending += done ? decoder.decode() : decoder.decode(value, { stream: true });
+        const lines = pending.split("\n");
+        pending = lines.pop() || "";
+        if (pending.length > 100000) throw new Error("Phản hồi của trợ lý vượt giới hạn cho phép.");
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          if (line.length > 100000) throw new Error("Phản hồi của trợ lý vượt giới hạn cho phép.");
+          const event = JSON.parse(line);
+          if (event.type === "partial" && typeof event.answer === "string") onPartial(event.answer);
+          else if (event.type === "done" && typeof event.answer === "string" && event.answer.trim() && Array.isArray(event.sources)) {
+            result = { answer: event.answer, sources: event.sources };
+          } else if (event.type === "error") throw new Error(event.message || "Trợ lý tạm thời gặp lỗi. Vui lòng thử lại.");
+          else throw new Error("Phản hồi của trợ lý không hợp lệ.");
+        }
+        if (done) break;
+      }
+    } finally {
+      if (!result) await reader.cancel().catch(() => {});
+      reader.releaseLock();
+    }
+    if (pending.trim() || !result) throw new Error("Câu trả lời bị ngắt giữa chừng. Vui lòng thử lại.");
+    return result;
+  } catch (error) {
+    if (signal.aborted) throw error;
+    if (timeout.aborted) throw new Error("Trợ lý phản hồi quá lâu. Vui lòng thử lại.", { cause: error });
+    if (error instanceof TypeError) throw new Error("Chưa thể kết nối với trợ lý. Vui lòng thử lại.", { cause: error });
+    throw error;
   }
-  return data;
 }

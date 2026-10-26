@@ -1,4 +1,5 @@
 const express = require("express");
+const { publishQueueUpdate } = require("../lib/queueEvents");
 const mongoose = require("mongoose");
 const Appointment = require("../models/Appointment");
 const Department = require("../models/Department");
@@ -117,6 +118,7 @@ router.post("/", async (req, res) => {
       reservedMinutes: reservedMinutes(slot.startsAt, slot.endsAt),
       notes: notes.trim(),
     });
+    publishQueueUpdate();
     return res.status(201).json({ appointment: response(appointment.toObject()) });
   } catch (error) {
     if (isAppointmentOverlap(error)) return res.status(409).json({
@@ -151,6 +153,7 @@ router.patch("/:id/cancel", async (req, res) => {
     $set: { status: "cancelled", cancelledAt: now },
     $push: { statusHistory: { status: "cancelled", at: now, actor: req.student._id } },
   });
+  publishQueueUpdate();
   res.json({ appointment: (await withQueueStatus([appointment]))[0] });
 });
 

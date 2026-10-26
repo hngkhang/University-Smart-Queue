@@ -17,6 +17,7 @@ import {
   fetchAppointments,
 } from "../services/appointments";
 import type { Appointment } from "../types";
+import { subscribeQueueUpdates } from "../services/queueRealtime";
 
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -37,9 +38,12 @@ export default function AppointmentsPage() {
   useEffect(() => {
     let active = true;
     let pending = false;
+    let queued = false;
     const load = () => {
-      if (pending) return;
+      if (!active) return;
+      if (pending) { queued = true; return; }
       pending = true;
+      queued = false;
       fetchAppointments()
       .then((data) => {
         if (active) {
@@ -63,15 +67,16 @@ export default function AppointmentsPage() {
       .finally(() => {
         pending = false;
         if (active) setLoading(false);
+        if (active && queued) load();
       });
     };
     load();
-    const timer = window.setInterval(() => { if (!document.hidden) load(); }, 5000);
+    const unsubscribe = subscribeQueueUpdates(load);
     const onFocus = () => load();
     window.addEventListener("focus", onFocus);
     return () => {
       active = false;
-      window.clearInterval(timer);
+      unsubscribe();
       window.removeEventListener("focus", onFocus);
     };
   }, [retry]);

@@ -37,15 +37,24 @@ export function useAssistant(open: boolean) {
     request.current = controller;
     setSending(true);
     setError("");
-    setMessages((previous) => [...previous, { id: crypto.randomUUID(), role: "user", content: text.trim() }]);
+    const assistantId = crypto.randomUUID();
+    setMessages((previous) => [...previous,
+      { id: crypto.randomUUID(), role: "user", content: text.trim() },
+      { id: assistantId, role: "assistant", content: "" },
+    ]);
     try {
-      const result = await sendAssistantMessage(text.trim(), controller.signal);
-      if (mounted.current) setMessages((previous) => [...previous, {
-        id: crypto.randomUUID(), role: "assistant", content: result.answer, sources: result.sources,
-      }]);
+      const result = await sendAssistantMessage(text.trim(), controller.signal, (answer) => {
+        if (mounted.current) setMessages((previous) => previous.map((item) =>
+          item.id === assistantId ? { ...item, content: answer } : item));
+      });
+      if (mounted.current) setMessages((previous) => previous.map((item) =>
+        item.id === assistantId ? { ...item, content: result.answer, sources: result.sources } : item));
       return true;
     } catch (reason) {
-      if (mounted.current && !controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Chưa thể gửi câu hỏi.");
+      if (mounted.current && !controller.signal.aborted) {
+        setMessages((previous) => previous.filter((item) => item.id !== assistantId));
+        setError(reason instanceof Error ? reason.message : "Chưa thể gửi câu hỏi.");
+      }
       return false;
     } finally {
       request.current = null;

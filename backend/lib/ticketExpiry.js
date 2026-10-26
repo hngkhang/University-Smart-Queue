@@ -1,4 +1,5 @@
 const Department = require("../models/Department");
+const { publishQueueUpdate } = require("./queueEvents");
 const Ticket = require("../models/QueueTicket");
 const Appointment = require("../models/Appointment");
 const { dateInVietnam, workingPeriods } = require("./appointmentSchedule");
@@ -40,12 +41,16 @@ async function cancelEndedTickets({ now = new Date(), department, student } = {}
   const pending = await Appointment.find({ status: "confirmed", ...(department ? { department } : {}), ...(student ? { student } : {}),
     $or: [{ startsAt: { $lt: cutoff } }, { startsAt: { $gte: cutoff, $lte: now }, department: { $in: endedOffices } }],
   }).select("_id").lean();
-  if (!pending.length) return result.modifiedCount;
+  if (!pending.length) {
+    if (result.modifiedCount) publishQueueUpdate();
+    return result.modifiedCount;
+  }
   const linked = await Ticket.find({ appointment: { $in: pending.map((item) => item._id) } }).select("appointment").lean();
   const linkedIds = new Set(linked.map((ticket) => String(ticket.appointment)));
-  await Appointment.updateMany({ _id: { $in: pending.filter((item) => !linkedIds.has(String(item._id))).map((item) => item._id) }, status: "confirmed" }, {
+  const expired = await Appointment.updateMany({ _id: { $in: pending.filter((item) => !linkedIds.has(String(item._id))).map((item) => item._id) }, status: "confirmed" }, {
     $set: { status: "cancelled", cancelledAt: now, cancellationReason: "end_of_day" },
   });
+  if (result.modifiedCount || expired.modifiedCount) publishQueueUpdate();
   return result.modifiedCount;
 }
 
