@@ -66,6 +66,7 @@ app.use("/api/queue", queueRoutes);
 app.use("/api/staff", require("./routes/staffRoutes"));
 app.use("/api/appointments", require("./routes/appointmentRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
+app.use("/api/ai", require("./routes/aiRoutes"));
 app.use((error, _req, res, _next) => {
   console.error("API error:", error.message);
   res.status(500).json({ message: "Unable to complete this request. Please try again." });

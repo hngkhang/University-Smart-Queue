@@ -12,8 +12,9 @@ import MyQueuePage from "./pages/MyQueuePage";
 import StaffWorkspace from "./pages/StaffWorkspace";
 import AdminWorkspace from "./pages/AdminWorkspace";
 import { useSessionValidation } from "./services/useSessionValidation";
+import AssistantWidget from "./features/ai/components/AssistantWidget";
 
-function App() {
+function AppContent() {
   useSessionValidation();
   const { pathname } = useLocation();
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
@@ -67,6 +68,12 @@ function App() {
       <Footer />
     </div>
   );
+}
+
+function App() {
+  const { pathname } = useLocation();
+  const showAssistant = pathname === "/" || pathname.startsWith("/departments/") || pathname === "/queue" || pathname === "/appointments" || pathname === "/appointments/new";
+  return <><AppContent />{showAssistant && <AssistantWidget />}</>;
 }
 
 export default App;

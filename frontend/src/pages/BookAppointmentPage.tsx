@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, Navigate, useSearchParams } from "react-router";
+import { Link, Navigate, useLocation, useSearchParams } from "react-router";
 import {
   ArrowLeft,
   CalendarDays,
@@ -22,6 +22,7 @@ import {
 } from "../services/appointments";
 import { readSession } from "../services/session";
 import type { Appointment, AppointmentSlot, Department } from "../types";
+import { readBookingHandoff, timePreferenceLabel, matchesTimePreference } from "../features/ai/bookingHandoff";
 
 const inputClass =
   "mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-[#3F6392] focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400";
@@ -29,6 +30,14 @@ const cardClass =
   "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7";
 
 export default function BookAppointmentPage() {
+  const location = useLocation();
+  // A new AI draft resets the form even when the user is already on this route.
+  return <BookingForm key={`${readSession()?.user.id || "guest"}:${location.state?.bookingDraftKey || "manual"}`} />;
+}
+
+function BookingForm() {
+  const location = useLocation();
+  const [prefill] = useState(() => readBookingHandoff(location.state?.bookingDraftKey));
   const [params, setParams] = useSearchParams();
   const departmentId = params.get("department") || "";
   const user = readSession()?.user;
@@ -36,10 +45,10 @@ export default function BookAppointmentPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [retry, setRetry] = useState(0);
-  const [services, setServices] = useState<string[]>([]);
-  const [date, setDate] = useState("");
+  const [services, setServices] = useState<string[]>(prefill?.services || []);
+  const [date, setDate] = useState(prefill?.date || "");
   const [time, setTime] = useState("");
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(prefill?.notes || "");
   const [availability, setAvailability] = useState<{
     key: string;
     slots: AppointmentSlot[];
@@ -58,6 +67,7 @@ export default function BookAppointmentPage() {
     estimatedDuration: department.serviceDetails?.find((item) => item.name === name)?.estimatedDuration ?? 0,
   })) ?? [];
   const selectedServices = serviceOptions.filter((item) => services.includes(item.name));
+  const unavailableServices = services.some(name => !serviceOptions.some(item => item.name === name));
   const hasDurations = selectedServices.length > 0 && selectedServices.every(
     (item) => Number.isInteger(item.estimatedDuration) && item.estimatedDuration > 0,
   );
@@ -75,7 +85,7 @@ export default function BookAppointmentPage() {
     date,
     refresh,
   ]);
-  const readyToLoad = Boolean(bookingEnabled && hasDurations && date);
+  const readyToLoad = Boolean(bookingEnabled && hasDurations && !unavailableServices && date);
   const slots = availability?.key === availabilityKey ? availability.slots : [];
   const slotsLoading = readyToLoad && availability?.key !== availabilityKey;
   const slotError =
@@ -242,6 +252,12 @@ export default function BookAppointmentPage() {
         {department ? "Back to Department" : "My Appointments"}
       </Link>
       <h1 className="sr-only">Book Appointment</h1>
+      {prefill && <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-slate-700" lang="vi">
+        <p className="font-semibold">Đã điền thông tin từ trợ lý. Chưa đặt lịch hoặc giữ chỗ.</p>
+        <p className="mt-1">Kiểm tra phòng, dịch vụ và ngày; chọn giờ còn trống rồi xác nhận ở cuối form.</p>
+        {prefill.timePreference && <p className="mt-1">Giờ mong muốn: {timePreferenceLabel(prefill.timePreference)}. Các giờ phù hợp được đánh dấu bên dưới.</p>}
+      </div>}
+      {location.state?.bookingDraftKey && !prefill && <p className="mt-5 rounded-xl bg-amber-50 p-4 text-sm text-amber-900" lang="vi">Bản nháp đã hết hạn hoặc trang vừa được tải lại. Hãy điền form hoặc tạo bản nháp mới.</p>}
       {loading ? (
         <p className="py-16 text-slate-500" role="status">
           Loading departments…
@@ -286,7 +302,7 @@ export default function BookAppointmentPage() {
                         event.target.value
                           ? { department: event.target.value }
                           : {},
-                        { replace: true },
+                        { replace: true, state: location.state },
                       );
                       setServices([]);
                       setDate("");
@@ -319,6 +335,10 @@ export default function BookAppointmentPage() {
                   <p id="booking-services-hint" className="mt-2 text-sm text-slate-500">
                     Choose one or more services in this department for a single visit.
                   </p>
+                  {!loading && unavailableServices && <div className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900" role="alert" lang="vi">
+                    Danh mục đã thay đổi hoặc có dịch vụ không còn khả dụng. Hãy chọn lại dịch vụ trước khi tiếp tục.
+                    <button type="button" className="mt-2 block min-h-11 font-semibold underline" onClick={() => { setServices([]); clearSelection(); }}>Xóa lựa chọn dịch vụ cũ</button>
+                  </div>}
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     {serviceOptions.map((item) => {
                       const available = Number.isInteger(item.estimatedDuration) && item.estimatedDuration > 0;
@@ -486,6 +506,7 @@ export default function BookAppointmentPage() {
                                         slot.available && <Check size={12} />}
                                       {appointmentTime(slot.startsAt)}
                                     </span>
+                                    {slot.available && prefill && matchesTimePreference(slot.startsAt, prefill.timePreference) && <span className="block text-[10px] font-normal">Giờ mong muốn</span>}
                                     {!slot.available && (
                                       <span className="block text-[10px] font-normal">
                                         Unavailable
