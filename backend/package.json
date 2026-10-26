@@ -11,6 +11,7 @@
     "start": "node server.js",
     "ai:ingest": "node scripts/ingestKnowledge.js",
     "test:ai-ingest": "node --test tests/aiIngest.test.js",
+    "test:ai-upload": "node --test tests/knowledgeUpload.test.js tests/adminKnowledge.test.js",
     "test:ai": "node --test tests/aiIngest.test.js tests/aiChat.test.js tests/aiRoutes.test.js tests/aiBooking.test.js tests/aiBookingRoutes.test.js",
     "test:ai-booking": "node --test tests/aiBooking.test.js tests/aiBookingRoutes.test.js",
     "test": "node --test tests/*.test.js"
